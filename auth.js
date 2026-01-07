@@ -320,6 +320,8 @@
         errorMessage = 'Invalid email or password';
       } else if (error.message.includes('Email not confirmed')) {
         errorMessage = 'Please confirm your email address first';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;
@@ -375,6 +377,8 @@
       let errorMessage = 'Signup failed. Please try again.';
       if (error.message.includes('already registered')) {
         errorMessage = 'Email already registered. Please login.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;
