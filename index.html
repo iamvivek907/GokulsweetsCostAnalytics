@@ -1754,9 +1754,7 @@
                     return { success: false, error: 'Not authenticated' };
                 }
                 
-                const deviceId = localStorage.getItem('device_id') || 
-                                 'device-' + Math.random().toString(36).substring(2, 15);
-                localStorage.setItem('device_id', deviceId);
+                const deviceId = getOrCreateDeviceId();
                 
                 // CRITICAL FIX: Use snapshot if provided, otherwise use current DATA
                 // This prevents race conditions where DATA changes between saveAllData() call and cloud save
@@ -1792,8 +1790,19 @@
                 // Show sync indicator
                 showSyncIndicator('saving');
                 
+                // Create payload with proper structure including synced_at timestamp
+                const payload = {
+                    ingredients: dataToSave.ingredients,
+                    recipes: dataToSave.recipes,
+                    shop_overhead: dataToSave.shop_overhead,
+                    factory_overhead: dataToSave.factory_overhead,
+                    staff: dataToSave.staff,
+                    profitMargin: dataToSave.profitMargin,
+                    synced_at: new Date().toISOString()
+                };
+                
                 if (window.SupabaseSync && window.SupabaseSync.isReady()) {
-                    const result = await window.SupabaseSync.saveData(deviceId, dataToSave, user.id);
+                    const result = await window.SupabaseSync.saveData(deviceId, payload, user.id);
                     
                     if (result && result.success) {
                         console.log('✅ User data saved to cloud');
@@ -1884,7 +1893,9 @@
             statusEl.textContent = '⏳ Saving...';
             
             try {
-                const result = await window.saveUserData(DATA);
+                // Create snapshot to maintain consistency with automatic save
+                const dataSnapshot = JSON.parse(JSON.stringify(DATA));
+                const result = await window.saveUserData(dataSnapshot);
                 
                 if (result && result.success) {
                     statusEl.style.color = 'var(--color-success)';
