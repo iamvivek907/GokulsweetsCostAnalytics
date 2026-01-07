@@ -161,16 +161,17 @@
           query = query.eq('user_id', userIdToUse);
         }
 
-        const { data, error } = await query.single();
+        const { data, error } = await query.maybeSingle();
 
         if (error) {
-          // If no data found, return null instead of throwing
-          if (error.code === 'PGRST116') {
-            console.log('No data found for device ID:', deviceId);
-            return null;
-          }
           console.error('Error loading data from Supabase:', error);
           throw error;
+        }
+
+        // maybeSingle() returns null if no data found
+        if (!data) {
+          console.log('No data found for device ID:', deviceId);
+          return null;
         }
 
         console.log('Data loaded from Supabase successfully');
