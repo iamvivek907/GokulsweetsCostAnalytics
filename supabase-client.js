@@ -169,7 +169,7 @@
         }
 
         // maybeSingle() returns null if no data found
-        if (!data) {
+        if (data === null) {
           console.log('No data found for device ID:', deviceId);
           return null;
         }
