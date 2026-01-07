@@ -3,10 +3,10 @@
 -- =============================================================================
 -- This schema supports:
 -- ✅ Multi-user authentication with Row Level Security
--- ✅ Shared organization workspace (all users see same data)
+-- ✅ Per-user data isolation (each user has their own workspace)
 -- ✅ Device sync across multiple devices per user
--- ✅ Real-time collaboration
--- ✅ Data isolation per organization
+-- ✅ Organization grouping for future shared workspace features
+-- ✅ Real-time collaboration capabilities
 -- =============================================================================
 
 -- Drop existing table if it has wrong schema
