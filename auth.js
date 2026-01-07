@@ -297,36 +297,14 @@
       return;
     }
 
-    // Prevent multiple simultaneous sign-in attempts
-    if (submitBtn.disabled) {
-      return;
-    }
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Signing in...';
-    
-    // Set timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Login';
-      showError('Login timeout. Please try again.');
-    }, 15000); // 15 second timeout
-
     try {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Signing in...';
       window.AuthUI.hideError();
 
       const result = await window.Auth.signIn(email, password);
       
-      clearTimeout(timeout);
-
       if (result.user) {
-        console.log('✅ Sign in successful');
-        
-        // Initialize real-time sync immediately after login
-        if (window.SupabaseSync && window.SupabaseSync.initRealtimeSync) {
-          window.SupabaseSync.initRealtimeSync();
-        }
-        
         window.AuthUI.hide();
         window.AuthUI.showApp();
         window.AuthUI.updateUserInfo(result.user.email);
@@ -337,49 +315,19 @@
         }
       }
     } catch (error) {
-      clearTimeout(timeout);
-      console.error('Sign in error:', error);
-      
       let errorMessage = 'Login failed. Please try again.';
-      if (error.message.includes('Invalid login credentials')) {
+      if (error.message && error.message.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password';
-      } else if (error.message.includes('Email not confirmed')) {
+      } else if (error.message && error.message.includes('Email not confirmed')) {
         errorMessage = 'Please confirm your email address first';
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
-      showError(errorMessage);
+      window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Login';
     }
   };
-
-  // Helper function to show error messages
-  function showError(message) {
-    // Create or update error message element
-    let errorDiv = document.getElementById('auth-error');
-    if (errorDiv) {
-      errorDiv.textContent = message;
-      errorDiv.style.display = 'block';
-    } else {
-      errorDiv = document.createElement('div');
-      errorDiv.id = 'auth-error';
-      errorDiv.style.cssText = 'display: block; color: #ef4444; background: #fee2e2; padding: 12px; border-radius: 8px; margin: 10px 0; text-align: center;';
-      const form = document.querySelector('.auth-form');
-      if (form) {
-        form.insertBefore(errorDiv, form.firstChild);
-      }
-      errorDiv.textContent = message;
-    }
-    
-    // Auto-hide after 5 seconds
-    setTimeout(() => {
-      if (errorDiv) {
-        errorDiv.style.display = 'none';
-      }
-    }, 5000);
-  }
 
   window.handleSignup = async function() {
     const email = document.getElementById('signup-email').value.trim();
@@ -427,8 +375,10 @@
       }
     } catch (error) {
       let errorMessage = 'Signup failed. Please try again.';
-      if (error.message.includes('already registered')) {
+      if (error.message && error.message.includes('already registered')) {
         errorMessage = 'Email already registered. Please login.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;

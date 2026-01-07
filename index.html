@@ -131,16 +131,6 @@
         ::-webkit-scrollbar-track{ background:transparent; }
         ::-webkit-scrollbar-thumb{ background:var(--color-border); border-radius:6px; }
 
-        /* Sync notification animations */
-        @keyframes slideIn {
-            from { transform: translateX(400px); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes slideOut {
-            from { transform: translateX(0); opacity: 1; }
-            to { transform: translateX(400px); opacity: 0; }
-        }
-
         /* PWA Update Banner */
         #update-banner{
             display:none; position:fixed; top:0; left:0; right:0; z-index:1000;
@@ -1447,38 +1437,6 @@
                     console.log('User authenticated:', session.user.email);
                     window.SupabaseSync.setUserId(session.user.id);
                     
-                    // Initialize real-time sync
-                    window.SupabaseSync.initRealtimeSync();
-                    
-                    // Setup real-time data sync callback
-                    window.SupabaseSync.onDataSync((eventType, newData) => {
-                        console.log('🔄 Syncing UI with real-time update...');
-                        
-                        if (newData && newData.payload) {
-                            // Merge remote changes with local state
-                            DATA = {
-                                ingredients: newData.payload.ingredients || {},
-                                recipes: newData.payload.recipes || {},
-                                shop_overhead: newData.payload.shop_overhead || { electricity: 0, gas: 0 },
-                                factory_overhead: newData.payload.factory_overhead || { electricity: 0, gas: 0 },
-                                staff: newData.payload.staff || {},
-                                profitMargin: newData.payload.profitMargin || DEFAULT_PROFIT_MARGIN
-                            };
-
-                            // Update localStorage
-                            saveAllData(DATA);
-
-                            // Refresh current view
-                            renderIngredientsTable();
-                            renderRecipesList();
-                            renderStaffTable();
-                            updateDashboard();
-
-                            // Show sync notification
-                            showSyncNotification('Data synced from another device');
-                        }
-                    });
-                    
                     // Show main app
                     window.AuthUI.hideApp();
                     initApp();
@@ -1500,43 +1458,9 @@
                     
                     if (event === 'SIGNED_IN' && session) {
                         window.SupabaseSync.setUserId(session.user.id);
-                        
-                        // Initialize real-time sync on sign in
-                        window.SupabaseSync.initRealtimeSync();
-                        
-                        // Setup real-time data sync callback
-                        window.SupabaseSync.onDataSync((eventType, newData) => {
-                            console.log('🔄 Syncing UI with real-time update...');
-                            
-                            if (newData && newData.payload) {
-                                // Merge remote changes with local state
-                                DATA = {
-                                    ingredients: newData.payload.ingredients || {},
-                                    recipes: newData.payload.recipes || {},
-                                    shop_overhead: newData.payload.shop_overhead || { electricity: 0, gas: 0 },
-                                    factory_overhead: newData.payload.factory_overhead || { electricity: 0, gas: 0 },
-                                    staff: newData.payload.staff || {},
-                                    profitMargin: newData.payload.profitMargin || DEFAULT_PROFIT_MARGIN
-                                };
-
-                                // Update localStorage
-                                saveAllData(DATA);
-
-                                // Refresh current view
-                                renderIngredientsTable();
-                                renderRecipesList();
-                                renderStaffTable();
-                                updateDashboard();
-
-                                // Show sync notification
-                                showSyncNotification('Data synced from another device');
-                            }
-                        });
-                        
                         await loadUserData(session.user.id);
                     } else if (event === 'SIGNED_OUT') {
                         window.SupabaseSync.setUserId(null);
-                        window.SupabaseSync.stopRealtimeSync();
                         clearLocalData();
                     }
                 });
@@ -1868,30 +1792,6 @@
                 localStorage.setItem('app_device_id', deviceId);
             }
             return deviceId;
-        }
-
-        // Show sync notification to user
-        function showSyncNotification(message) {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #10b981;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 8px;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-                z-index: 10000;
-                animation: slideIn 0.3s ease;
-            `;
-            notification.textContent = `🔄 ${message}`;
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.style.animation = 'slideOut 0.3s ease';
-                setTimeout(() => notification.remove(), 300);
-            }, 3000);
         }
 
         // Populate device ID on load
