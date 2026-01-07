@@ -9,8 +9,8 @@
     // Supabase configuration (optional - can be set at deployment time)
     // If these are set, the app will use them automatically instead of requiring manual input
     supabase: {
-      url: '', // e.g., 'https://yourproject.supabase.co'
-      anonKey: '', // e.g., 'your-anon-key-here'
+      url: '', // REPLACE: e.g., 'https://yourproject.supabase.co'
+      anonKey: '', // REPLACE: e.g., 'your-anon-key-here'
       autoSync: false // Set to true to enable automatic sync on app load
     },
 

@@ -1062,10 +1062,12 @@
                     window.AppConfig.supabase.url && 
                     window.AppConfig.supabase.anonKey) {
                     console.log('Auto-sync enabled, attempting to load data from cloud...');
-                    // Delay slightly to ensure UI is ready
-                    setTimeout(() => {
-                        autoLoadFromCloud();
-                    }, 1000);
+                    // Use requestIdleCallback or setTimeout to ensure UI is fully ready
+                    if ('requestIdleCallback' in window) {
+                        requestIdleCallback(() => autoLoadFromCloud());
+                    } else {
+                        setTimeout(() => autoLoadFromCloud(), 1000);
+                    }
                 }
             }
 
@@ -1099,11 +1101,14 @@
                 if (result && result.payload) {
                     const payload = result.payload;
                     
-                    // Validate payload
-                    if (typeof payload === 'object' && 
-                        typeof payload.ingredients === 'object' &&
-                        typeof payload.recipes === 'object') {
-                        
+                    // Validate payload (check for null and object type)
+                    if (!payload || typeof payload !== 'object' || 
+                        typeof payload.ingredients !== 'object' ||
+                        typeof payload.recipes !== 'object') {
+                        console.warn('Auto-sync: invalid data structure received');
+                        return;
+                    }
+                    
                         // Update local data
                         DATA = {
                             ingredients: payload.ingredients || {},
@@ -1239,7 +1244,7 @@
 
                 // Validate payload structure before assignment
                 const payload = result.payload;
-                if (typeof payload !== 'object' || payload === null) {
+                if (!payload || typeof payload !== 'object') {
                     statusEl.innerHTML = '<span class="sync-status error">❌ Invalid data format received</span>';
                     return;
                 }

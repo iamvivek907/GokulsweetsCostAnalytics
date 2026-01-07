@@ -22,7 +22,8 @@ self.addEventListener('install', event => {
       })
       .catch(err => {
         console.error('Cache failed:', err);
-        // Don't fail installation if caching fails
+        // Continue installation even if caching fails
+        return Promise.resolve();
       })
   );
   // Force the waiting service worker to become the active service worker
