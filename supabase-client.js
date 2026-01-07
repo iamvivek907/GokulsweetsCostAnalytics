@@ -168,8 +168,8 @@
           throw error;
         }
 
-        // maybeSingle() returns null if no data found
-        if (data === null) {
+        // maybeSingle() returns null when no rows are found
+        if (!data) {
           console.log('No data found for device ID:', deviceId);
           return null;
         }
