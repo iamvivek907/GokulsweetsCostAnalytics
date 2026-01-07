@@ -1,10 +1,17 @@
 # Gokul Sweets Cost Analytics - PWA
 
-A Progressive Web App for restaurant and sweets shop cost analytics, profit tracking, and recipe management.
+A Progressive Web App for restaurant and sweets shop cost analytics, profit tracking, and recipe management with **secure user authentication** and cloud sync.
 
 ![Dashboard](https://github.com/user-attachments/assets/70f0cbae-ae21-4646-8beb-55b5bb50cc63)
 
 ## ✨ Features
+
+### 🔐 User Authentication (NEW!)
+- **Secure Login/Signup**: Email and password authentication via Supabase Auth
+- **Protected Data**: Each user's data is isolated with Row Level Security (RLS)
+- **Session Management**: Automatic login persistence across sessions
+- **Multi-Device Sync**: Access your data from any device after logging in
+- **Account Management**: Logout functionality and user profile display
 
 ### 📱 Progressive Web App (PWA)
 - **Install to Home Screen**: Works like a native app on mobile and desktop
@@ -13,10 +20,11 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
 - **Auto-Updates**: Users are notified when new versions are available
 
 ### ☁️ Cloud Sync with Supabase
-- **Automatic Sync**: Configure once, sync automatically on app load
-- **Manual Sync**: Save and load data on-demand
-- **Device-Based**: Each device has its own unique data store
-- **Environment Configuration**: Set credentials at deployment time
+- **Authenticated Sync**: Automatic data sync when logged in
+- **User-Scoped Data**: Each user can only access their own recipes and data
+- **Auto-Save**: Changes automatically sync to cloud (debounced)
+- **Secure Storage**: Data encrypted in transit and protected by RLS policies
+- **Environment Configuration**: Credentials injected at deployment time (no secrets in code)
 
 ### 💼 Business Analytics
 - **Ingredient Management**: Track raw materials and costs
@@ -29,30 +37,47 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
 
 ### For Users
 
+**Authentication Required**: To use cloud sync features, you'll need to create an account.
+
 1. **Visit the deployed app**: [Your GitHub Pages URL]
-2. **Add to Home Screen**:
+2. **Create an account or Login**:
+   - First-time users: Click "Sign up" and create an account
+   - Returning users: Login with your credentials
+3. **Add to Home Screen** (optional):
    - On iOS: Tap Share → Add to Home Screen
    - On Android: Tap Menu → Install App
-3. **Start adding data**: Ingredients, recipes, and staff
-4. **Optional - Cloud Sync**: Configure Supabase in Settings to enable cloud backup
+4. **Start managing your business**: Add ingredients, create recipes, track staff
+5. **Automatic Cloud Sync**: Your data automatically syncs across all your devices
 
 ### For Developers
 
-#### Deploy to GitHub Pages
+#### Deploy to GitHub Pages with Authentication
 
-1. **Fork or clone** this repository
-2. **Enable GitHub Pages**:
+**Prerequisites**: You need a Supabase project. See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed setup instructions.
+
+1. **Set up Supabase** (one-time setup):
+   - Create a free Supabase project at https://supabase.com
+   - Run the SQL schema from `SUPABASE_SETUP.md` to create tables and RLS policies
+   - Get your Project URL and anon key
+
+2. **Configure GitHub Secrets**:
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Add `SUPABASE_URL` (your Supabase project URL)
+   - Add `SUPABASE_ANON_KEY` (your Supabase anon key)
+
+3. **Enable GitHub Pages**:
    - Go to Settings → Pages
-   - Source: Deploy from a branch
-   - Branch: `main` or your working branch
-   - Folder: `/ (root)`
+   - Source: **GitHub Actions** (not "Deploy from a branch")
    - Save
 
-3. **Your app will be live at**: `https://<username>.github.io/<repo-name>/`
+4. **Deploy**:
+   - Push any commit to `main` or `master` branch
+   - GitHub Actions will automatically inject credentials and deploy
+   - Your app will be live at: `https://<username>.github.io/<repo-name>/`
 
-#### Configure Supabase (Optional)
+#### Configure Supabase (Required for Authentication)
 
-To enable automatic cloud sync:
+To enable user authentication and cloud sync:
 
 1. **Create a Supabase project** at https://supabase.com
 
@@ -221,24 +246,32 @@ open http://localhost:8888
 
 ### Best Practices
 
-**For Personal/Single-User Use:**
-- ✅ Don't commit `config.js` with credentials to public GitHub repos
-- ✅ Or keep the repository private
-- ✅ Or accept that anyone can read/write your data
+**✅ Current Implementation (Secure)**
+This app now includes:
+- ✅ **Supabase Auth**: Email/password authentication implemented
+- ✅ **Row Level Security (RLS)**: Users can only access their own data
+- ✅ **GitHub Secrets**: Credentials injected at build time (not in code)
+- ✅ **Protected Routes**: Main app only accessible after login
+- ✅ **Secure by Default**: Safe to use in production with proper Supabase setup
 
-**For Production/Multi-User Use:**
-- ✅ **MUST** implement Supabase Auth with user login
-- ✅ **MUST** use production RLS policies (see setup section above)
-- ✅ Each user will only see their own data
-- ✅ Only then is it safe to commit anon key to GitHub
-- ❌ Never commit service role key (only use anon key in frontend)
-- ✅ Monitor Supabase usage for abuse
-- ✅ Regular backups using Export feature
+**Deployment Security:**
+- ✅ **Use GitHub Secrets**: Store credentials as repository secrets, not in code
+- ✅ **Enable RLS**: Always enable Row Level Security in Supabase
+- ✅ **Anon Key Only**: Never commit service role key (only use anon key in frontend)
+- ✅ **Monitor Usage**: Check Supabase dashboard for unusual activity
+- ✅ **Regular Backups**: Use Export feature to backup data
+
+**⚠️ Important Notes:**
+- The anon key is safe to expose **only** with RLS enabled
+- Without RLS, anyone with the anon key can access all data
+- Follow setup instructions in `SUPABASE_SETUP.md` carefully
+- Test RLS policies with multiple test accounts before production use
 
 ### Data Storage
-- **Local**: IndexedDB/localStorage (persistent)
-- **Cloud**: Supabase (optional, encrypted in transit)
+- **Local**: localStorage (persistent, works offline)
+- **Cloud**: Supabase (authenticated, user-scoped, encrypted in transit)
 - **Export**: JSON format (can be imported later)
+- **Sync**: Automatic when authenticated, debounced to reduce API calls
 
 ## 📊 Features in Detail
 
@@ -289,16 +322,38 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 - Click "Unregister" and reload
 - Check "Update on reload" during development
 
-For more help, see [DEPLOYMENT.md](./DEPLOYMENT.md)
+**Authentication issues?**
+- Check that GitHub Secrets are configured correctly
+- Verify Supabase Auth is enabled in your project
+- Check browser console for specific error messages
+- Try creating a new account instead of logging in
+- See `SUPABASE_SETUP.md` for detailed troubleshooting
+
+For more help, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)
+
+## 📸 Screenshots
+
+### Authentication
+| Login Screen | Signup Screen |
+|--------------|---------------|
+| ![Login](https://github.com/user-attachments/assets/26431fd9-0597-45b0-bdf3-d3e8a105d969) | ![Signup](https://github.com/user-attachments/assets/f2a039d5-1249-470d-b88d-e351d9167a1c) |
+
+### Dashboard
+![Dashboard](https://github.com/user-attachments/assets/24019f66-218c-49cb-9b09-5c07f88956de)
 
 ## 🎯 Roadmap
 
-- [ ] Multi-user support with authentication
+- [x] ~~Multi-user support with authentication~~ ✅ **COMPLETED**
+- [x] ~~Secure cloud sync with RLS~~ ✅ **COMPLETED**
+- [ ] Password reset functionality
+- [ ] Social authentication (Google, GitHub)
 - [ ] Recipe scaling calculator
 - [ ] Export to PDF reports
 - [ ] Chart visualizations
 - [ ] Mobile-optimized recipe cards
 - [ ] Barcode scanner for ingredients
+- [ ] Team collaboration features
+- [ ] Public recipe sharing
 
 ---
 
