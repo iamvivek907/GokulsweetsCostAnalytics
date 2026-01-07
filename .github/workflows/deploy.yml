@@ -1,0 +1,75 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Inject Supabase credentials
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "Injecting Supabase configuration..."
+          
+          # Use environment variables and proper escaping for sed
+          # Using | as delimiter to avoid conflicts with / in URLs
+          sed -i "s|url: '__SUPABASE_URL__'|url: '${SUPABASE_URL}'|g" config.js
+          sed -i "s|anonKey: '__SUPABASE_ANON_KEY__'|anonKey: '${SUPABASE_ANON_KEY}'|g" config.js
+          
+          # Also inject into index.html if placeholders exist there
+          if grep -q "__SUPABASE_URL__" index.html; then
+            sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
+            sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
+          fi
+          
+          echo "Configuration injected successfully"
+          
+      - name: Verify configuration
+        run: |
+          echo "Checking if credentials were injected..."
+          if grep -q "__SUPABASE_URL__" config.js; then
+            echo "⚠️  Warning: SUPABASE_URL placeholder not replaced"
+            echo "Make sure SUPABASE_URL secret is configured in repository settings"
+          else
+            echo "✅ SUPABASE_URL injected"
+          fi
+          
+          if grep -q "__SUPABASE_ANON_KEY__" config.js; then
+            echo "⚠️  Warning: SUPABASE_ANON_KEY placeholder not replaced"
+            echo "Make sure SUPABASE_ANON_KEY secret is configured in repository settings"
+          else
+            echo "✅ SUPABASE_ANON_KEY injected"
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
