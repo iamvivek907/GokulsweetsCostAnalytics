@@ -60,6 +60,8 @@
         .tab-content{ display:none; animation:fadeIn .18s ease-in; }
         .tab-content.active{ display:block; }
         @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
+        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        .spinning { animation: spin 1s linear infinite; display: inline-block; }
 
         .page-padding{ padding:16px; max-width:1200px; margin:0 auto; }
 
@@ -787,7 +789,7 @@
                             console.error('Auto-save to cloud failed:', err);
                         });
                     }
-                }, 2000); // Debounce for 2 seconds
+                }, 1000); // Debounce for 1 second (reduced from 2s for faster sync)
             }
         }
 
@@ -1476,46 +1478,77 @@
             }
         }
 
-        // Load user data from Supabase
+        // Force load user data from cloud (called after login)
         async function loadUserData(userId) {
+            if (!userId) {
+                console.error('❌ No user ID provided to loadUserData');
+                return;
+            }
+            
             try {
-                const deviceId = getOrCreateDeviceId();
-                const result = await window.SupabaseSync.loadData(deviceId, userId);
+                console.log('📥 Loading user data for:', userId);
                 
-                if (result && result.payload) {
-                    const payload = result.payload;
+                // Get device ID
+                const deviceId = getOrCreateDeviceId();
+                
+                // Load from cloud
+                if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+                    const cloudData = await window.SupabaseSync.loadData(deviceId, userId);
                     
-                    // Validate payload structure
-                    if (!payload || typeof payload !== 'object' || 
-                        typeof payload.ingredients !== 'object' ||
-                        typeof payload.recipes !== 'object') {
-                        console.warn('Invalid data structure received');
-                        return;
+                    if (cloudData && cloudData.payload) {
+                        console.log('✅ Cloud data found, syncing with local...');
+                        
+                        // Get current local data
+                        const localData = loadData();
+                        
+                        // Prefer cloud data (it's the source of truth), but keep local as fallback
+                        DATA = {
+                            ingredients: cloudData.payload.ingredients || localData.ingredients || {},
+                            recipes: cloudData.payload.recipes || localData.recipes || {},
+                            shop_overhead: cloudData.payload.shop_overhead || localData.shop_overhead || { electricity: 0, gas: 0 },
+                            factory_overhead: cloudData.payload.factory_overhead || localData.factory_overhead || { electricity: 0, gas: 0 },
+                            staff: cloudData.payload.staff || localData.staff || {},
+                            profitMargin: cloudData.payload.profitMargin || localData.profitMargin || DEFAULT_PROFIT_MARGIN
+                        };
+                        
+                        // Update localStorage with cloud data
+                        saveAllData(DATA);
+                        
+                        // Refresh all UI elements
+                        renderIngredientsTable();
+                        renderRecipesList();
+                        renderStaffTable();
+                        updateDashboard();
+                        
+                        console.log('✅ User data loaded and UI updated', {
+                            ingredients: Object.keys(DATA.ingredients).length,
+                            recipes: Object.keys(DATA.recipes).length,
+                            staff: Object.keys(DATA.staff).length
+                        });
+                    } else {
+                        console.log('ℹ️ No cloud data found, using local data');
+                        // Still refresh UI with local data
+                        renderIngredientsTable();
+                        renderRecipesList();
+                        renderStaffTable();
+                        updateDashboard();
                     }
-                    
-                    // Update local data
-                    DATA = {
-                        ingredients: payload.ingredients || {},
-                        recipes: payload.recipes || {},
-                        shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
-                        factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
-                        staff: payload.staff || {},
-                        profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
-                    };
-                    saveAllData(DATA);
-                    
-                    // Re-render
+                } else {
+                    console.warn('⚠️ Supabase not ready, using local data only');
+                    // Refresh UI with local data
                     renderIngredientsTable();
                     renderRecipesList();
                     renderStaffTable();
                     updateDashboard();
-                    
-                    console.log('User data loaded successfully');
-                } else {
-                    console.log('No cloud data found for user, using local/default data');
                 }
             } catch (error) {
-                console.error('Failed to load user data:', error);
+                console.error('❌ Error loading user data:', error);
+                // Don't throw - use local data as fallback and refresh UI
+                console.log('ℹ️ Falling back to local data');
+                renderIngredientsTable();
+                renderRecipesList();
+                renderStaffTable();
+                updateDashboard();
             }
         }
 
@@ -1527,6 +1560,9 @@
             }
 
             try {
+                // Show sync indicator
+                showSyncIndicator('saving');
+                
                 const deviceId = getOrCreateDeviceId();
                 const userId = window.Auth.getCurrentUser()?.id;
                 
@@ -1541,68 +1577,210 @@
                 };
                 
                 await window.SupabaseSync.saveData(deviceId, payload, userId);
-                console.log('User data saved to cloud');
+                console.log('✅ User data saved to cloud');
+                
+                // Show success indicator
+                showSyncIndicator('success');
             } catch (error) {
                 console.error('Failed to save user data:', error);
+                showSyncIndicator('error');
             }
         }
 
-        // Initialize user data for new accounts
-        async function initializeUserData(userId) {
-            // Use existing local data if available
-            await saveUserData();
+        // Show sync status indicator
+        function showSyncIndicator(status) {
+            let indicator = document.getElementById('sync-indicator');
+            
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'sync-indicator';
+                indicator.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    padding: 10px 16px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    z-index: 9999;
+                    transition: opacity 0.3s, transform 0.3s;
+                `;
+                document.body.appendChild(indicator);
+            }
+            
+            if (status === 'saving') {
+                indicator.style.background = '#3b82f6';
+                indicator.style.color = 'white';
+                indicator.innerHTML = '<span class="spinning">⏳</span><span>Saving...</span>';
+                indicator.style.opacity = '1';
+                indicator.style.transform = 'translateY(0)';
+            } else if (status === 'success') {
+                indicator.style.background = '#10b981';
+                indicator.style.color = 'white';
+                indicator.innerHTML = '<span>✅</span><span>Saved</span>';
+                indicator.style.opacity = '1';
+                indicator.style.transform = 'translateY(0)';
+                
+                // Hide after 2 seconds
+                setTimeout(() => {
+                    indicator.style.opacity = '0';
+                    indicator.style.transform = 'translateY(10px)';
+                }, 2000);
+            } else if (status === 'error') {
+                indicator.style.background = '#ef4444';
+                indicator.style.color = 'white';
+                indicator.innerHTML = '<span>❌</span><span>Save failed</span>';
+                indicator.style.opacity = '1';
+                indicator.style.transform = 'translateY(0)';
+                
+                // Hide after 3 seconds
+                setTimeout(() => {
+                    indicator.style.opacity = '0';
+                    indicator.style.transform = 'translateY(10px)';
+                }, 3000);
+            }
         }
 
-        // Clear local data on logout
+        // Initialize user data for new signups
+        async function initializeUserData(userId) {
+            console.log('🆕 Initializing data for new user:', userId);
+            
+            // Use existing local data if any, otherwise start fresh
+            const currentData = loadData();
+            
+            // Save initial data to cloud
+            if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+                try {
+                    const deviceId = getOrCreateDeviceId();
+                    
+                    await window.SupabaseSync.saveData(deviceId, currentData, userId);
+                    console.log('✅ Initial data saved to cloud');
+                } catch (error) {
+                    console.error('❌ Error initializing cloud data:', error);
+                }
+            }
+        }
+
+        // Called on logout to handle local data cleanup
+        // Note: This intentionally preserves localStorage to avoid data loss
+        // when users switch accounts or re-login. The real cleanup happens
+        // on the next login when cloud data is loaded.
         function clearLocalData() {
-            console.log('Clearing local data on logout');
-            // Don't actually clear, just reload defaults
-            DATA = loadData();
-            renderIngredientsTable();
-            renderRecipesList();
-            renderStaffTable();
-            updateDashboard();
+            console.log('🗑️ Handling logout data cleanup...');
+            // Don't actually clear localStorage - preserve it for next login
+            // This prevents data loss if user immediately logs back in
+            console.log('ℹ️ Local storage preserved for next login');
         }
 
         // Make saveUserData available globally for auto-sync
         window.loadUserData = loadUserData;
         window.initializeUserData = initializeUserData;
         window.clearLocalData = clearLocalData;
+        window.saveUserData = saveUserData;
+
+        // Note: Data is auto-saved with 1-second debounce after changes
+        // This ensures data is synced to cloud quickly without needing beforeunload
+        // localStorage is always updated immediately, providing offline persistence
 
         // run init once DOM ready
         document.addEventListener('DOMContentLoaded', initAuthSystem);
 
         // ------------------ PWA SERVICE WORKER REGISTRATION ------------------
         let newWorker = null;
+        let updateCheckInterval = null;
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js')
                 .then(registration => {
                     console.log('Service Worker registered:', registration);
 
+                    // Check for updates periodically (every 60 seconds)
+                    updateCheckInterval = setInterval(() => {
+                        registration.update().catch(err => {
+                            console.error('Service Worker update check failed:', err);
+                        });
+                    }, 60000);
+
                     // Check for updates
                     registration.addEventListener('updatefound', () => {
                         newWorker = registration.installing;
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                // New service worker installed and waiting
-                                showUpdateBanner();
+                                console.log('🔄 New version available, preparing to update...');
+                                // Auto-update after showing brief notification
+                                showUpdateNotification();
+                                
+                                // Auto-update after 3 seconds to give user awareness
+                                setTimeout(() => {
+                                    console.log('🔄 Auto-updating to new version...');
+                                    updateApp();
+                                }, 3000);
                             }
                         });
                     });
                 })
-                .catch(err => console.error('Service Worker registration failed:', err));
+                .catch(err => {
+                    console.error('Service Worker registration failed:', err);
+                    // Clean up interval if registration fails
+                    if (updateCheckInterval) {
+                        clearInterval(updateCheckInterval);
+                        updateCheckInterval = null;
+                    }
+                });
 
             // Listen for controller change (new SW activated)
             navigator.serviceWorker.addEventListener('controllerchange', () => {
                 console.log('New service worker activated, reloading...');
-                window.location.reload();
+                // Save data before reload
+                if (window.Auth && window.Auth.isAuthenticated() && typeof saveUserData === 'function') {
+                    saveUserData().then(() => {
+                        window.location.reload();
+                    }).catch(() => {
+                        window.location.reload();
+                    });
+                } else {
+                    window.location.reload();
+                }
             });
         }
 
         function showUpdateBanner() {
             const banner = document.getElementById('update-banner');
             if (banner) banner.classList.add('show');
+        }
+
+        function showUpdateNotification() {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #3b82f6;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-size: 14px;
+                animation: slideIn 0.3s ease-out;
+            `;
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span>🔄</span>
+                    <span>New version available! Updating...</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s';
+                setTimeout(() => notification.remove(), 300);
+            }, 2500);
         }
 
         function updateApp() {
@@ -1837,7 +2015,6 @@
                   const tabId = activeTab.id;
                   if (tabId === 'dashboard-tab') {
                     updateDashboard();
-                    renderDashboard();
                   } else if (tabId === 'ingredients-tab') {
                     renderIngredientsTable();
                   } else if (tabId === 'recipes-tab') {

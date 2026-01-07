@@ -119,13 +119,32 @@
       };
     },
 
-    // Stop real-time sync
+    // Stop real-time sync with proper cleanup
     stopRealtimeSync() {
       if (this.realtimeChannel) {
-        this.client.removeChannel(this.realtimeChannel);
-        this.realtimeChannel = null;
-        this.syncCallbacks = [];
-        console.log('🛑 Real-time sync stopped');
+        try {
+          console.log('🛑 Stopping real-time sync...');
+          
+          // Unsubscribe from channel
+          this.realtimeChannel.unsubscribe();
+          
+          // Remove channel
+          if (this.client) {
+            this.client.removeChannel(this.realtimeChannel);
+          }
+          
+          this.realtimeChannel = null;
+          this.syncCallbacks = [];
+          
+          console.log('✅ Real-time sync stopped and cleaned up');
+        } catch (error) {
+          console.error('❌ Error stopping real-time sync:', error);
+          // Force cleanup even on error
+          this.realtimeChannel = null;
+          this.syncCallbacks = [];
+        }
+      } else {
+        console.log('ℹ️ No active real-time channel to stop');
       }
     },
 
