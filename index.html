@@ -566,6 +566,16 @@
                     </div>
 
                     <div class="form-section">
+                        <div class="form-section-title">🔄 Manual Data Sync</div>
+                        <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;">Force save current data to cloud (useful for debugging)</p>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+                            <button class="btn btn-primary" onclick="manualCloudSave()">💾 Force Save Now</button>
+                            <button class="btn btn-secondary" onclick="manualCloudLoad()">⬇️ Force Load Now</button>
+                        </div>
+                        <div id="manual-sync-status" style="margin-top:8px; font-size:12px; color:var(--color-text-secondary);"></div>
+                    </div>
+
+                    <div class="form-section">
                         <div class="form-section-title">🔧 Advanced: GitHub Gist Quick-Save</div>
                         <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;"><strong>For developers only:</strong> Save a snapshot to GitHub Gist (requires personal access token).</p>
                         <div class="form-group">
@@ -847,6 +857,12 @@
                 console.warn('⚠️ Saving potentially invalid data');
             }
             
+            // CRITICAL: Create a deep clone to prevent mutation during async save
+            // Use structuredClone if available (modern browsers), fallback to JSON method
+            const dataSnapshot = (typeof structuredClone !== 'undefined') 
+                ? structuredClone(data) 
+                : JSON.parse(JSON.stringify(data));
+            
             // Save to localStorage
             try {
                 localStorage.setItem(STORAGE_KEYS.ingredients, JSON.stringify(data.ingredients));
@@ -865,13 +881,21 @@
                 console.error('❌ Error saving to localStorage:', error);
             }
             
-            // Auto-save to cloud if authenticated (debounced)
+            // Auto-save to cloud if authenticated (debounced) with snapshot
             if (window.Auth && window.Auth.isAuthenticated()) {
                 clearTimeout(window.autoSaveTimeout);
                 window.autoSaveTimeout = setTimeout(() => {
                     if (typeof window.saveUserData === 'function') {
-                        window.saveUserData().catch(err => {
+                        // CRITICAL FIX: Pass snapshot instead of relying on global DATA
+                        window.saveUserData(dataSnapshot).catch(err => {
                             console.error('Auto-save to cloud failed:', err);
+                            // Retry once after 5 seconds
+                            setTimeout(() => {
+                                console.log('🔄 Retrying cloud save...');
+                                window.saveUserData(dataSnapshot).catch(retryErr => {
+                                    console.error('❌ Retry also failed:', retryErr);
+                                });
+                            }, 5000);
                         });
                     }
                 }, 2000); // Debounce for 2 seconds
@@ -1725,54 +1749,83 @@
         }
 
         // Save user data to Supabase (called automatically when data changes)
-        async function saveUserData() {
-            if (!window.Auth.isAuthenticated()) {
-                console.warn('⚠️ Not authenticated, skipping cloud save');
-                return;
-            }
-
+        async function saveUserData(dataSnapshot = null) {
             try {
                 const user = window.Auth.getCurrentUser();
                 if (!user) {
                     console.warn('⚠️ No user authenticated, skipping cloud save');
-                    return;
+                    return { success: false, error: 'Not authenticated' };
                 }
                 
                 const deviceId = getOrCreateDeviceId();
                 
-                console.log('💾 Saving data to cloud:', {
-                    ingredients: Object.keys(DATA.ingredients || {}).length,
-                    recipes: Object.keys(DATA.recipes || {}).length,
-                    staff: Object.keys(DATA.staff || {}).length
+                // CRITICAL FIX: Use snapshot if provided, otherwise use current DATA
+                // This prevents race conditions where DATA changes between saveAllData() call and cloud save
+                const dataToSave = dataSnapshot || DATA;
+                
+                // Validate before saving
+                const recipeCount = Object.keys(dataToSave.recipes || {}).length;
+                const ingredientCount = Object.keys(dataToSave.ingredients || {}).length;
+                const staffCount = Object.keys(dataToSave.staff || {}).length;
+                
+                console.log('💾 Saving to shared workspace...');
+                console.log('📊 Payload preview:', {
+                    ingredients: ingredientCount,
+                    recipes: recipeCount,
+                    staff: staffCount
                 });
+                
+                // CRITICAL: Log recipe details to debug
+                if (recipeCount > 0) {
+                    console.log('✅ Recipes being saved:', Object.keys(dataToSave.recipes));
+                } else {
+                    console.warn('⚠️ WARNING: Attempting to save with ZERO recipes!');
+                    console.warn('⚠️ Current DATA.recipes:', Object.keys(DATA.recipes || {}).length);
+                    console.warn('⚠️ This might be a race condition - aborting save');
+                    
+                    // SAFETY: Don't overwrite cloud data with empty recipes if we had recipes before
+                    if (Object.keys(DATA.recipes || {}).length > 0) {
+                        console.error("❌ ABORT: Preventing data loss - local has recipes but save payload doesn't");
+                        return { success: false, error: 'Data consistency check failed' };
+                    }
+                }
                 
                 // Show sync indicator
                 showSyncIndicator('saving');
                 
+                // Create payload with proper structure including synced_at timestamp
                 const payload = {
-                    ingredients: DATA.ingredients,
-                    recipes: DATA.recipes,
-                    shop_overhead: DATA.shop_overhead,
-                    factory_overhead: DATA.factory_overhead,
-                    staff: DATA.staff,
-                    profitMargin: DATA.profitMargin,
+                    ingredients: dataToSave.ingredients,
+                    recipes: dataToSave.recipes,
+                    shop_overhead: dataToSave.shop_overhead,
+                    factory_overhead: dataToSave.factory_overhead,
+                    staff: dataToSave.staff,
+                    profitMargin: dataToSave.profitMargin,
                     synced_at: new Date().toISOString()
                 };
                 
                 if (window.SupabaseSync && window.SupabaseSync.isReady()) {
-                    await window.SupabaseSync.saveData(deviceId, payload, user.id);
-                    console.log('✅ Data saved to cloud successfully');
+                    const result = await window.SupabaseSync.saveData(deviceId, payload, user.id);
                     
-                    // Show success indicator
-                    showSyncIndicator('success');
+                    if (result && result.success) {
+                        console.log('✅ User data saved to cloud');
+                        showSyncIndicator('success');
+                        return { success: true };
+                    } else {
+                        console.error('❌ Cloud save returned failure');
+                        showSyncIndicator('error');
+                        return { success: false, error: 'Save operation failed' };
+                    }
                 } else {
                     console.warn('⚠️ Supabase not ready, data saved locally only');
                     showSyncIndicator('error');
+                    return { success: false, error: 'Supabase not ready' };
                 }
             } catch (error) {
                 console.error('❌ Error saving to cloud:', error);
+                console.error('Error stack:', error.stack);
                 showSyncIndicator('error');
-                // Don't throw - already handled with UI feedback
+                return { success: false, error: error.message };
             }
         }
 
@@ -1831,6 +1884,68 @@
                     indicator.style.opacity = '0';
                     indicator.style.transform = 'translateY(10px)';
                 }, 3000);
+            }
+        }
+
+        // Manual cloud save for debugging
+        async function manualCloudSave() {
+            const statusEl = document.getElementById('manual-sync-status');
+            if (!statusEl) return;
+            
+            statusEl.style.color = 'var(--color-warning)';
+            statusEl.textContent = '⏳ Saving...';
+            
+            try {
+                // Create snapshot to maintain consistency with automatic save
+                // Use structuredClone if available (modern browsers), fallback to JSON method
+                const dataSnapshot = (typeof structuredClone !== 'undefined') 
+                    ? structuredClone(DATA) 
+                    : JSON.parse(JSON.stringify(DATA));
+                const result = await window.saveUserData(dataSnapshot);
+                
+                if (result && result.success) {
+                    statusEl.style.color = 'var(--color-success)';
+                    statusEl.textContent = `✅ Saved! Recipes: ${Object.keys(DATA.recipes || {}).length}, Ingredients: ${Object.keys(DATA.ingredients || {}).length}`;
+                } else {
+                    statusEl.style.color = 'var(--color-error)';
+                    statusEl.textContent = '❌ Save failed: ' + (result.error || 'Unknown error');
+                }
+            } catch (error) {
+                statusEl.style.color = 'var(--color-error)';
+                statusEl.textContent = '❌ Error: ' + error.message;
+            }
+        }
+
+        // Manual cloud load for debugging
+        async function manualCloudLoad() {
+            const statusEl = document.getElementById('manual-sync-status');
+            if (!statusEl) return;
+            
+            statusEl.style.color = 'var(--color-warning)';
+            statusEl.textContent = '⏳ Loading...';
+            
+            try {
+                const user = window.Auth.getCurrentUser();
+                if (!user) {
+                    statusEl.style.color = 'var(--color-error)';
+                    statusEl.textContent = '❌ Not authenticated';
+                    return;
+                }
+                
+                await window.loadUserData(user.id);
+                
+                statusEl.style.color = 'var(--color-success)';
+                statusEl.textContent = `✅ Loaded! Recipes: ${Object.keys(DATA.recipes || {}).length}, Ingredients: ${Object.keys(DATA.ingredients || {}).length}`;
+                
+                // Refresh UI
+                updateDashboard();
+                renderDashboard();
+                renderRecipesList();
+                renderIngredientsTable();
+                renderStaffTable();
+            } catch (error) {
+                statusEl.style.color = 'var(--color-error)';
+                statusEl.textContent = '❌ Error: ' + error.message;
             }
         }
 
