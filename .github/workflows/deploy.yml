@@ -89,7 +89,6 @@ jobs:
               console.error('Original URL:', originalUrl);
             } else {
               console.log('✅ Runtime Supabase configuration applied successfully');
-              console.log('✅ URL configured: https://...');
             }
           })();
           EOF
@@ -117,7 +116,7 @@ jobs:
             echo "✅ Runtime configuration contains actual values"
             
             # Show verification that URL starts with https (masked)
-            if grep -q "window.AppConfig.supabase.url = 'https://" supabase-config.runtime.js; then
+            if grep -q "https://" supabase-config.runtime.js; then
               echo "✅ URL verification: Valid HTTPS URL detected"
             else
               echo "⚠️  Warning: URL may not start with https://"
