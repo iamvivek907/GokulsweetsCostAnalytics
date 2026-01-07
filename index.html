@@ -1435,13 +1435,17 @@
                 if (session && session.user) {
                     // User is authenticated
                     console.log('User authenticated:', session.user.email);
-                    window.SupabaseSync.setUserId(session.user.id);
                     
                     // Show main app
                     window.AuthUI.hideApp();
                     initApp();
                     document.getElementById('app-container').style.display = 'flex';
                     window.AuthUI.updateUserInfo(session.user.email);
+                    
+                    // Initialize real-time sync
+                    if (window.SupabaseSync.isReady()) {
+                        window.SupabaseSync.initRealtimeSync();
+                    }
                     
                     // Load user data
                     await loadUserData(session.user.id);
@@ -1457,10 +1461,8 @@
                     console.log('Auth state changed:', event);
                     
                     if (event === 'SIGNED_IN' && session) {
-                        window.SupabaseSync.setUserId(session.user.id);
                         await loadUserData(session.user.id);
                     } else if (event === 'SIGNED_OUT') {
-                        window.SupabaseSync.setUserId(null);
                         clearLocalData();
                     }
                 });
@@ -1801,6 +1803,119 @@
                 deviceIdInput.value = getOrCreateDeviceId();
             }
         });
+
+        // Real-time sync integration
+        (function() {
+          'use strict';
+          
+          // Initialize real-time sync listener after authentication
+          function setupRealtimeSync() {
+            if (!window.SupabaseSync || !window.SupabaseSync.isReady()) {
+              console.warn('⚠️ SupabaseSync not ready');
+              return;
+            }
+            
+            console.log('🔄 Setting up real-time sync listener...');
+            
+            // Register callback for real-time updates
+            window.SupabaseSync.onDataSync((eventType, newPayload) => {
+              console.log('🔔 Real-time data update received:', eventType);
+              
+              if (newPayload) {
+                // Merge remote changes with local state
+                DATA = {
+                  ...DATA,
+                  ...newPayload
+                };
+                
+                // Update localStorage
+                saveAllData(DATA);
+                
+                // Refresh current view
+                const activeTab = document.querySelector('.tab-content.active');
+                if (activeTab) {
+                  const tabId = activeTab.id;
+                  if (tabId === 'dashboard-tab') {
+                    updateDashboard();
+                    renderDashboard();
+                  } else if (tabId === 'ingredients-tab') {
+                    renderIngredientsTable();
+                  } else if (tabId === 'recipes-tab') {
+                    renderRecipesList();
+                  } else if (tabId === 'settings-tab') {
+                    renderStaffTable();
+                  }
+                }
+                
+                // Show sync notification
+                showSyncNotification('Data synced from another user');
+              }
+            });
+            
+            console.log('✅ Real-time sync listener registered');
+          }
+          
+          // Show sync notification
+          function showSyncNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: #10b981;
+              color: white;
+              padding: 12px 20px;
+              border-radius: 8px;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              z-index: 10000;
+              animation: slideIn 0.3s ease;
+              font-size: 14px;
+              font-weight: 600;
+            `;
+            notification.textContent = `🔄 ${message}`;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+              notification.style.animation = 'slideOut 0.3s ease';
+              setTimeout(() => notification.remove(), 300);
+            }, 3000);
+          }
+          
+          // Setup on auth state change
+          if (window.Auth) {
+            window.Auth.onAuthStateChange((event, session) => {
+              if (event === 'SIGNED_IN' && session) {
+                console.log('✅ User signed in, initializing real-time sync');
+                // Initialize real-time sync
+                if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+                  window.SupabaseSync.initRealtimeSync();
+                  setupRealtimeSync();
+                }
+              } else if (event === 'SIGNED_OUT') {
+                console.log('🛑 User signed out, stopping real-time sync');
+                if (window.SupabaseSync) {
+                  window.SupabaseSync.stopRealtimeSync();
+                }
+              }
+            });
+          }
+          
+          // Add CSS animations
+          const style = document.createElement('style');
+          style.textContent = `
+            @keyframes slideIn {
+              from { transform: translateX(400px); opacity: 0; }
+              to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+              from { transform: translateX(0); opacity: 1; }
+              to { transform: translateX(400px); opacity: 0; }
+            }
+          `;
+          document.head.appendChild(style);
+          
+          console.log('✅ Real-time sync integration loaded');
+        })();
     </script>
     
     <!-- Load Supabase configuration -->

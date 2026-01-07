@@ -1,23 +1,22 @@
 // Supabase Client Helper for Gokul Sweets Cost Analytics
-// Enhanced with authentication support and user-scoped operations
+// Shared workspace with real-time synchronization
 
 (function() {
   'use strict';
 
-  // Global namespace for Supabase sync
   window.SupabaseSync = {
     client: null,
     isInitialized: false,
-    supabaseLib: null,
-    currentUserId: null,
+    organizationId: 'gokul_sweets',
+    realtimeChannel: null,
+    syncCallbacks: [],
 
-    // Initialize the Supabase client with URL and anon key
+    // Initialize Supabase client
     async init(supabaseUrl, supabaseKey) {
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase URL and anon key are required');
       }
 
-      // Dynamically load Supabase library if not already loaded
       if (!window.supabase) {
         await this._loadSupabaseLibrary();
       }
@@ -25,29 +24,12 @@
       try {
         this.client = window.supabase.createClient(supabaseUrl, supabaseKey);
         this.isInitialized = true;
-        
-        // Check for existing session and set user ID
-        const { data: { session } } = await this.client.auth.getSession();
-        if (session && session.user) {
-          this.currentUserId = session.user.id;
-        }
-        
-        console.log('Supabase client initialized successfully');
+        console.log('✅ Supabase client initialized');
         return true;
       } catch (error) {
-        console.error('Failed to initialize Supabase client:', error);
+        console.error('❌ Failed to initialize Supabase:', error);
         throw error;
       }
-    },
-
-    // Set current user ID (called after authentication)
-    setUserId(userId) {
-      this.currentUserId = userId;
-    },
-
-    // Get current user ID
-    getUserId() {
-      return this.currentUserId;
     },
 
     // Load Supabase library from CDN
@@ -61,79 +43,149 @@
         const script = document.createElement('script');
         script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
         script.onload = () => {
-          console.log('Supabase library loaded from CDN');
+          console.log('✅ Supabase library loaded');
           resolve();
         };
         script.onerror = () => {
-          reject(new Error('Failed to load Supabase library from CDN'));
+          reject(new Error('Failed to load Supabase library'));
         };
         document.head.appendChild(script);
       });
     },
 
-    // Save data to Supabase (upsert into gokul_app_data table with user_id)
-    async saveData(deviceId, payload, userId = null) {
+    // Initialize real-time subscription
+    initRealtimeSync() {
       if (!this.isInitialized || !this.client) {
-        throw new Error('Supabase client not initialized. Call init() first.');
+        console.error('❌ Cannot init realtime: client not initialized');
+        return;
       }
 
-      // Use provided userId or current user ID
-      const userIdToUse = userId || this.currentUserId;
-      
-      if (!userIdToUse) {
-        console.warn('No user ID available, cannot save to cloud');
+      console.log('🔄 Initializing real-time sync...');
+
+      this.realtimeChannel = this.client
+        .channel('gokul_app_data_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'gokul_app_data',
+            filter: `organization_id=eq.${this.organizationId}`
+          },
+          (payload) => {
+            console.log('🔔 Real-time update received:', payload);
+            this.handleRealtimeUpdate(payload);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Real-time sync active');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Real-time channel error');
+          } else if (status === 'TIMED_OUT') {
+            console.warn('⚠️ Real-time subscription timed out, retrying...');
+            setTimeout(() => this.initRealtimeSync(), 5000);
+          } else {
+            console.log('📡 Real-time status:', status);
+          }
+        });
+    },
+
+    // Handle real-time updates
+    handleRealtimeUpdate(payload) {
+      const { eventType, new: newRecord } = payload;
+
+      if (newRecord && newRecord.payload) {
+        console.log(`🔄 Processing ${eventType} event`);
+        
+        this.syncCallbacks.forEach(callback => {
+          try {
+            callback(eventType, newRecord.payload);
+          } catch (error) {
+            console.error('Error in sync callback:', error);
+          }
+        });
+      }
+    },
+
+    // Register callback for real-time updates
+    onDataSync(callback) {
+      this.syncCallbacks.push(callback);
+      return () => {
+        const index = this.syncCallbacks.indexOf(callback);
+        if (index > -1) {
+          this.syncCallbacks.splice(index, 1);
+        }
+      };
+    },
+
+    // Stop real-time sync
+    stopRealtimeSync() {
+      if (this.realtimeChannel) {
+        this.client.removeChannel(this.realtimeChannel);
+        this.realtimeChannel = null;
+        this.syncCallbacks = [];
+        console.log('🛑 Real-time sync stopped');
+      }
+    },
+
+    // Save data to shared organization workspace
+    async saveData(deviceId, payload, userId = null) {
+      if (!this.isInitialized || !this.client) {
+        throw new Error('Supabase client not initialized');
+      }
+
+      if (!userId) {
+        console.warn('⚠️ No user ID - cannot save to cloud');
         return { success: false, error: 'Not authenticated' };
       }
 
       try {
-        console.log('Saving data to Supabase...');
+        console.log('💾 Saving to shared workspace...');
 
-        // First, check if a record exists
+        // Check if organization record exists
         const { data: existing, error: selectError } = await this.client
           .from('gokul_app_data')
           .select('id')
-          .eq('user_id', userIdToUse)
-          .eq('device_id', deviceId)
+          .eq('organization_id', this.organizationId)
           .maybeSingle();
 
-        if (selectError) {
-          console.error('Error checking existing data:', selectError);
+        if (selectError && selectError.code !== 'PGRST116') {
           throw selectError;
         }
+
+        const dataToSave = {
+          organization_id: this.organizationId,
+          user_id: userId,
+          device_id: deviceId,
+          payload: payload,
+          updated_at: new Date().toISOString()
+        };
 
         let result;
         
         if (existing) {
-          // Update existing record
-          console.log('Updating existing record...');
+          // Update existing shared record
+          console.log('📝 Updating shared organization data...');
           result = await this.client
             .from('gokul_app_data')
-            .update({ 
-              payload: payload, 
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', existing.id)
+            .update(dataToSave)
+            .eq('organization_id', this.organizationId)
             .select();
         } else {
-          // Insert new record
-          console.log('Inserting new record...');
+          // Insert new shared record
+          console.log('➕ Creating shared organization data...');
           result = await this.client
             .from('gokul_app_data')
-            .insert({
-              user_id: userIdToUse,
-              device_id: deviceId,
-              payload: payload,
-              updated_at: new Date().toISOString()
-            })
+            .insert(dataToSave)
             .select();
         }
 
         if (result.error) {
-          console.error('❌ Error saving data to Supabase:', result.error);
           throw result.error;
         }
 
-        console.log('✅ Data saved to Supabase successfully:', result.data);
+        console.log('✅ Data saved to shared workspace');
         return { success: true, data: result.data };
       } catch (error) {
         console.error('❌ Failed to save data:', error);
@@ -141,47 +193,38 @@
       }
     },
 
-    // Load data from Supabase (select from gokul_app_data table)
+    // Load data from shared organization workspace
     async loadData(deviceId, userId = null) {
       if (!this.isInitialized || !this.client) {
-        throw new Error('Supabase client not initialized. Call init() first.');
+        throw new Error('Supabase client not initialized');
       }
 
-      // Use provided userId or current user ID
-      const userIdToUse = userId || this.currentUserId;
-
       try {
-        let query = this.client
+        console.log('📥 Loading shared organization data...');
+
+        const { data, error } = await this.client
           .from('gokul_app_data')
           .select('payload, updated_at')
-          .eq('device_id', deviceId);
+          .eq('organization_id', this.organizationId)
+          .maybeSingle();
 
-        // Add user_id filter if available (for authenticated mode)
-        if (userIdToUse) {
-          query = query.eq('user_id', userIdToUse);
-        }
-
-        const { data, error } = await query.single();
-
-        if (error) {
-          // If no data found, return null instead of throwing
-          if (error.code === 'PGRST116') {
-            console.log('No data found for device ID:', deviceId);
-            return null;
-          }
-          console.error('Error loading data from Supabase:', error);
+        if (error && error.code !== 'PGRST116') {
           throw error;
         }
 
-        console.log('Data loaded from Supabase successfully');
-        return data;
+        if (data && data.payload) {
+          console.log('✅ Loaded shared data from cloud');
+          return data;
+        } else {
+          console.log('📭 No cloud data found for organization');
+          return null;
+        }
       } catch (error) {
-        console.error('Failed to load data:', error);
+        console.error('❌ Failed to load data:', error);
         throw error;
       }
     },
 
-    // Check if client is initialized
     isReady() {
       return this.isInitialized && this.client !== null;
     }
