@@ -9,592 +9,114 @@
     <meta name="theme-color" content="#1f212121">
     <title>Restaurant Profit Analytics</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --color-bg: #0f0f0f;
-            --color-surface: #1a1a1a;
-            --color-surface-light: #2d2d2d;
-            --color-primary: #2d96a1;
-            --color-primary-hover: #3ca8b4;
-            --color-success: #32b8c6;
-            --color-error: #ff5459;
-            --color-warning: #ffa500;
-            --color-text: #f5f5f5;
-            --color-text-secondary: #a7a9a9;
-            --color-border: #3a3a3a;
-            --radius: 8px;
-            --radius-lg: 12px;
-            --safe-top: max(12px, env(safe-area-inset-top));
+        /* Base reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root{
+            --color-bg:#0f0f0f; --color-surface:#1a1a1a; --color-surface-light:#2d2d2d;
+            --color-primary:#2d96a1; --color-primary-hover:#3ca8b4; --color-success:#32b8c6;
+            --color-error:#ff5459; --color-warning:#ffa500; --color-text:#f5f5f5;
+            --color-text-secondary:#a7a9a9; --color-border:#3a3a3a;
+            --radius:8px; --radius-lg:12px; --safe-top: max(12px, env(safe-area-inset-top));
             --safe-bottom: max(12px, env(safe-area-inset-bottom));
         }
 
-        html, body {
-            width: 100%;
-            height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background-color: var(--color-bg);
-            color: var(--color-text);
-            overflow: hidden;
+        html,body {
+            height:100%;
+            width:100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background:var(--color-bg); color:var(--color-text);
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
         }
 
-        #app-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            width: 100%;
+        /* Container layout */
+        #app-container{
+            display:flex; flex-direction:column; min-height:100vh;
         }
 
-        .header {
-            background: var(--color-surface);
-            padding: 16px;
-            padding-top: calc(16px + var(--safe-top));
-            border-bottom: 1px solid var(--color-border);
-            z-index: 100;
+        .header{
+            background:var(--color-surface); padding:16px; padding-top:calc(16px + var(--safe-top));
+            border-bottom:1px solid var(--color-border); z-index:100;
         }
+        .header h1{ font-size:20px; font-weight:600; }
 
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
+        .content-area{
+            flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+            padding-bottom: calc(72px + var(--safe-bottom));
+            padding-top:12px;
         }
 
-        .content-area {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding-bottom: calc(70px + var(--safe-bottom));
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .tab-content {
-            display: none;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .page-padding {
-            padding: 16px;
-            max-width: 100%;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: 16px;
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin: 8px 0;
-            color: var(--color-primary);
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .dishes-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .dish-row {
-            background: var(--color-surface);
-            border-left: 4px solid var(--color-primary);
-            border-radius: var(--radius-lg);
-            padding: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .dish-row.profit-alert {
-            border-left-color: var(--color-error);
-            background: rgba(255, 84, 89, 0.1);
-        }
-
-        .dish-row:active {
-            transform: scale(0.98);
-        }
-
-        .dish-name {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .dish-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            font-size: 12px;
-        }
-
-        .detail-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-        }
-
-        .detail-label {
-            color: var(--color-text-secondary);
-        }
-
-        .detail-value {
-            font-weight: 600;
-            color: var(--color-text);
-        }
-
-        .profit-margin {
-            font-size: 14px;
-            font-weight: 700;
-            margin-top: 8px;
-        }
-
-        .profit-margin.positive {
-            color: var(--color-success);
-        }
-
-        .profit-margin.negative {
-            color: var(--color-error);
-        }
-
-        .suggested-price {
-            background: rgba(253, 197, 100, 0.15);
-            border-left: 2px solid var(--color-warning);
-            padding: 8px;
-            margin-top: 8px;
-            border-radius: 4px;
-            font-size: 11px;
-        }
-
-        .form-section {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: 16px;
-            margin-bottom: 16px;
-        }
-
-        .form-section-title {
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            color: var(--color-text-secondary);
-            margin-bottom: 12px;
-            letter-spacing: 0.5px;
-        }
-
-        .form-group {
-            margin-bottom: 12px;
-        }
-
-        label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: var(--color-text);
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 10px 12px;
-            background: var(--color-surface-light);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius);
-            color: var(--color-text);
-            font-size: 14px;
-            font-family: inherit;
-            -webkit-appearance: none;
-            appearance: none;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: var(--color-primary);
-            box-shadow: 0 0 0 2px rgba(45, 150, 161, 0.2);
-        }
-
-        select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a7a9a9' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 10px center;
-            padding-right: 32px;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .btn {
-            padding: 12px 16px;
-            border: none;
-            border-radius: var(--radius);
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            touch-action: manipulation;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-
-        .btn-primary {
-            background: var(--color-primary);
-            color: #fff;
-            width: 100%;
-        }
-
-        .btn-primary:active {
-            background: var(--color-primary-hover);
-            transform: scale(0.98);
-        }
-
-        .btn-secondary {
-            background: var(--color-surface-light);
-            color: var(--color-text);
-            border: 1px solid var(--color-border);
-            width: 100%;
-        }
+        .tab-content{ display:none; animation:fadeIn .18s ease-in; }
+        .tab-content.active{ display:block; }
+        @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
 
-        .btn-secondary:active {
-            background: var(--color-border);
-        }
-
-        .btn-danger {
-            background: var(--color-error);
-            color: #fff;
-            width: 100%;
-        }
-
-        .btn-danger:active {
-            opacity: 0.8;
-        }
-
-        .btn-small {
-            padding: 8px 12px;
-            font-size: 12px;
-            width: auto;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 12px;
-            margin-top: 16px;
-        }
-
-        .btn-group .btn {
-            flex: 1;
-        }
-
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--color-surface);
-            border-top: 1px solid var(--color-border);
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0;
-            padding-bottom: max(8px, env(safe-area-inset-bottom));
-            z-index: 200;
-        }
-
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 8px;
-            gap: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            border: none;
-            background: none;
-            color: var(--color-text-secondary);
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        .nav-item.active {
-            color: var(--color-primary);
-        }
-
-        .nav-icon {
-            font-size: 20px;
-        }
-
-        .table-container {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 16px;
-            font-size: 12px;
-        }
-
-        th {
-            background: var(--color-surface-light);
-            padding: 10px;
-            text-align: left;
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-            border-bottom: 1px solid var(--color-border);
-        }
-
-        td {
-            padding: 10px;
-            border-bottom: 1px solid var(--color-border);
-            font-size: 12px;
-        }
-
-        tr:hover {
-            background: var(--color-surface-light);
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 300;
-            padding: 20px;
-            padding-top: var(--safe-top);
-            justify-content: center;
-            align-items: flex-end;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--color-surface);
-            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-            padding: 20px;
-            width: 100%;
-            max-height: 80vh;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            animation: slideUp 0.3s ease-out;
-        }
+        .page-padding{ padding:16px; max-width:1200px; margin:0 auto; }
 
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        .modal-header {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--color-text);
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0;
-            width: 32px;
-            height: 32px;
-        }
-
-        .alert {
-            position: fixed;
-            top: var(--safe-top);
-            left: 16px;
-            right: 16px;
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: 12px 16px;
-            z-index: 400;
-            animation: slideDown 0.3s ease-out;
-            font-size: 13px;
-        }
-
-        @keyframes slideDown {
-            from { transform: translateY(-100%); }
-            to { transform: translateY(0); }
-        }
-
-        .alert.success {
-            border-color: var(--color-success);
-            background: rgba(50, 184, 198, 0.1);
-        }
-
-        .alert.error {
-            border-color: var(--color-error);
-            background: rgba(255, 84, 89, 0.1);
-        }
-
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--color-bg);
-        }
+        .stats-grid{ display:grid; grid-template-columns: repeat(2,1fr); gap:12px; margin-bottom:20px; }
+        .stat-card{ background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:12px; text-align:center; }
+        .stat-label{ font-size:12px; color:var(--color-text-secondary); text-transform:uppercase; }
+        .stat-value{ font-size:20px; font-weight:700; color:var(--color-primary); margin-top:6px; }
 
-        ::-webkit-scrollbar-thumb {
-            background: var(--color-border);
-            border-radius: 3px;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--color-text-secondary);
-        }
-
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--color-text);
-        }
-
-        .dept-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-            margin-right: 4px;
-        }
+        .dishes-list{ display:flex; flex-direction:column; gap:12px; }
 
-        .dept-badge.sweets {
-            background: rgba(255, 165, 0, 0.2);
-            color: var(--color-warning);
-        }
+        .form-section{ background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:14px; margin-bottom:16px; }
+        .form-section-title{ font-size:13px; font-weight:600; color:var(--color-text-secondary); margin-bottom:10px; letter-spacing:0.5px; text-transform:uppercase; }
 
-        .dept-badge.restaurant {
-            background: rgba(45, 150, 161, 0.2);
-            color: var(--color-primary);
-        }
+        label{ display:block; font-size:13px; margin-bottom:6px; color:var(--color-text); font-weight:500; }
 
-        .dept-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 16px;
-        }
+        input,select,textarea{ width:100%; padding:10px 12px; background:var(--color-surface-light); border:1px solid var(--color-border); border-radius:var(--radius); color:var(--Color-text); font-size:14px; font-family:inherit; }
+        textarea{ min-height:80px; resize:vertical; }
 
-        .dept-stat {
-            background: var(--color-surface-light);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 12px;
-        }
+        .form-row{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 
-        .dept-stat-label {
-            color: var(--color-text-secondary);
-            margin-bottom: 4px;
-            font-size: 10px;
-        }
+        .btn{ padding:10px 14px; border:none; border-radius:var(--radius); font-weight:700; cursor:pointer; }
+        .btn-primary{ background:var(--color-primary); color:#fff; }
+        .btn-secondary{ background:var(--color-surface-light); color:var(--color-text); border:1px solid var(--color-border); }
+        .btn-danger{ background:var(--color-error); color:#fff; }
 
-        .dept-stat-value {
-            font-weight: 700;
-            font-size: 14px;
-            color: var(--color-primary);
+        .bottom-nav{
+            position:fixed; left:0; right:0; bottom:0; background:var(--color-surface); border-top:1px solid var(--color-border);
+            display:grid; grid-template-columns:repeat(4,1fr); z-index:200; padding-bottom:max(8px, env(safe-area-inset-bottom));
         }
+        .nav-item{ padding:12px 8px; text-align:center; background:none; border:none; color:var(--color-text-secondary); font-size:12px; cursor:pointer; }
+        .nav-item.active{ color:var(--color-primary); font-weight:700; }
 
-        .location-card {
-            background: var(--color-surface-light);
-            border-left: 3px solid var(--color-primary);
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 12px;
-        }
+        table{ width:100%; border-collapse:collapse; font-size:13px; }
+        th,td{ padding:10px; border-bottom:1px solid var(--color-border); text-align:left; }
+        th{ background:var(--color-surface-light); color:var(--color-text-secondary); font-size:12px; font-weight:700; }
 
-        .location-card.sweets {
-            border-left-color: var(--color-warning);
-        }
+        .modal{ display:none; position:fixed; left:0; right:0; top:0; bottom:0; background:rgba(0,0,0,.45); z-index:300; justify-content:center; align-items:flex-end; padding:20px; padding-top:var(--safe-top); }
+        .modal.active{ display:flex; }
+        .modal-content{ width:100%; max-width:720px; background:var(--color-surface); border-radius:12px 12px 8px 8px; padding:16px; max-height:80vh; overflow:auto; }
 
-        .location-title {
-            font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 8px;
-        }
+        .empty-state{ text-align:center; padding:28px 10px; color:var(--color-text-secondary); }
 
-        .cost-row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            padding: 4px 0;
+        /* Responsive tweaks */
+        @media (max-width: 700px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .modal-content { border-radius:12px; max-width:100%; padding:14px; }
+            .header h1 { font-size:18px; }
+            th, td { font-size:13px; padding:8px; }
         }
 
-        .cost-label {
-            color: var(--color-text-secondary);
+        @media (min-width: 900px) {
+            .page-padding { padding:24px; }
+            .stats-grid { grid-template-columns: repeat(4,1fr); }
         }
 
-        .cost-value {
-            font-weight: 600;
-            color: var(--color-text);
-        }
+        /* improved scrollbar for desktop */
+        ::-webkit-scrollbar{ width:8px; height:8px; }
+        ::-webkit-scrollbar-track{ background:transparent; }
+        ::-webkit-scrollbar-thumb{ background:var(--color-border); border-radius:6px; }
     </style>
 </head>
 <body>
     <div id="app-container">
-        <div class="header">
-            <h1 id="page-title">Dashboard</h1>
-        </div>
+        <div class="header"><h1 id="page-title">Dashboard</h1></div>
 
         <div class="content-area">
-            <!-- DASHBOARD TAB -->
+            <!-- DASHBOARD -->
             <div id="dashboard-tab" class="tab-content active">
                 <div class="page-padding">
                     <div class="stats-grid">
@@ -612,23 +134,20 @@
                         </div>
                         <div class="stat-card">
                             <div class="stat-label">At Risk</div>
-                            <div class="stat-value" id="stat-red-dishes" style="color: var(--color-error);">0</div>
+                            <div class="stat-value" id="stat-red-dishes" style="color:var(--color-error);">0</div>
                         </div>
                     </div>
 
-                    <div style="margin-bottom: 16px;">
-                        <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Your Dishes</h2>
+                    <div style="margin-top:12px;">
+                        <h2 style="font-size:15px; margin-bottom:10px;">Your Dishes</h2>
                         <div id="dashboard-dishes-list" class="dishes-list">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📋</div>
-                                <div class="empty-state-title">No dishes yet</div>
-                            </div>
+                            <div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">No dishes yet</div></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- INGREDIENTS TAB -->
+            <!-- INGREDIENTS -->
             <div id="ingredients-tab" class="tab-content">
                 <div class="page-padding">
                     <div class="form-section">
@@ -654,33 +173,27 @@
                                 <input type="number" id="ingredient-price" placeholder="0.00" step="0.01">
                             </div>
                         </div>
-                        <button class="btn btn-primary" onclick="addIngredient()">Add Ingredient</button>
+                        <div style="margin-top:8px;">
+                            <button class="btn btn-primary" onclick="addIngredient()">Add Ingredient</button>
+                        </div>
                     </div>
 
-                    <div style="margin-bottom: 16px;">
-                        <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Raw Materials Library</h2>
-                        <div class="table-container">
+                    <div>
+                        <h2 style="font-size:15px; margin-bottom:10px;">Raw Materials Library</h2>
+                        <div style="overflow-x:auto;">
                             <table>
                                 <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Unit</th>
-                                        <th>Price</th>
-                                        <th>Action</th>
-                                    </tr>
+                                    <tr><th>Name</th><th>Unit</th><th>Price</th><th>Action</th></tr>
                                 </thead>
                                 <tbody id="ingredients-table-body"></tbody>
                             </table>
                         </div>
-                        <div id="ingredients-empty" class="empty-state">
-                            <div class="empty-state-icon">📦</div>
-                            <div class="empty-state-title">No ingredients yet</div>
-                        </div>
+                        <div id="ingredients-empty" class="empty-state" style="display:none;"><div class="empty-state-icon">📦</div><div class="empty-state-title">No ingredients yet</div></div>
                     </div>
                 </div>
             </div>
 
-            <!-- RECIPES TAB -->
+            <!-- RECIPES -->
             <div id="recipes-tab" class="tab-content">
                 <div class="page-padding">
                     <div class="form-section">
@@ -702,7 +215,8 @@
                                 <input type="number" id="recipe-selling-price" placeholder="0.00" step="0.01">
                             </div>
                         </div>
-                        <div class="form-row">
+
+                        <div class="form-row" style="margin-top:10px;">
                             <div class="form-group">
                                 <label>Wastage %</label>
                                 <input type="number" id="recipe-wastage" placeholder="0" min="0" max="100" step="0.1" value="10">
@@ -712,60 +226,63 @@
                                 <input type="number" id="recipe-daily-volume" placeholder="50" min="1" step="1" value="50">
                             </div>
                         </div>
-                        <div class="form-section" style="margin-top: 16px;">
+
+                        <div class="form-section" style="margin-top:12px;">
                             <div class="form-section-title">Recipe Ingredients</div>
-                            <div id="recipe-ingredients-list" style="margin-bottom: 12px;"></div>
-                            <button class="btn btn-secondary btn-small" onclick="openIngredientSelector()">+ Add Ingredient</button>
+                            <div id="recipe-ingredients-list" style="margin-bottom:12px;"></div>
+                            <div style="margin-top:8px;">
+                                <button class="btn btn-secondary" onclick="openIngredientSelector()">+ Add Ingredient</button>
+                            </div>
                         </div>
-                        
-                        <div id="recipe-cost-preview" class="form-section" style="margin-top: 16px; background: rgba(50, 184, 198, 0.05); border-color: var(--color-primary);">
-                            <div style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px; font-weight: 600;">📊 COST BREAKDOWN</div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 12px; margin-bottom: 12px;">
-                                <div style="background: var(--color-surface); padding: 10px; border-radius: 6px;">
-                                    <div style="color: var(--color-text-secondary); font-size: 10px; margin-bottom: 4px;">Raw Cost</div>
-                                    <div style="font-weight: 700; font-size: 14px;" id="preview-raw-cost">₹0.00</div>
+
+                        <div id="recipe-cost-preview" class="form-section" style="background:rgba(50,184,198,0.04); border-color:var(--color-primary);">
+                            <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:10px; font-weight:600;">📊 COST BREAKDOWN</div>
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; font-size:12px;">
+                                <div style="background:var(--color-surface); padding:10px; border-radius:6px;">
+                                    <div style="color:var(--color-text-secondary); font-size:11px;">Raw Cost</div>
+                                    <div style="font-weight:700; font-size:14px;" id="preview-raw-cost">₹0.00</div>
                                 </div>
-                                <div style="background: var(--color-surface); padding: 10px; border-radius: 6px;">
-                                    <div style="color: var(--color-text-secondary); font-size: 10px; margin-bottom: 4px;">Wastage</div>
-                                    <div style="font-weight: 700; font-size: 14px; color: var(--color-warning);" id="preview-wastage-cost">₹0.00</div>
+                                <div style="background:var(--color-surface); padding:10px; border-radius:6px;">
+                                    <div style="color:var(--color-text-secondary); font-size:11px;">Wastage</div>
+                                    <div style="font-weight:700; font-size:14px; color:var(--color-warning);" id="preview-wastage-cost">₹0.00</div>
                                 </div>
-                                <div style="background: var(--color-surface); padding: 10px; border-radius: 6px;">
-                                    <div style="color: var(--color-text-secondary); font-size: 10px; margin-bottom: 4px;">Labour</div>
-                                    <div style="font-weight: 700; font-size: 14px; color: var(--color-primary);" id="preview-labour-cost">₹0.00</div>
+                                <div style="background:var(--color-surface); padding:10px; border-radius:6px;">
+                                    <div style="color:var(--color-text-secondary); font-size:11px;">Labour</div>
+                                    <div style="font-weight:700; font-size:14px; color:var(--color-primary);" id="preview-labour-cost">₹0.00</div>
                                 </div>
-                                <div style="background: var(--color-surface); padding: 10px; border-radius: 6px;">
-                                    <div style="color: var(--color-text-secondary); font-size: 10px; margin-bottom: 4px;">Utilities</div>
-                                    <div style="font-weight: 700; font-size: 14px; color: var(--color-primary);" id="preview-utilities-cost">₹0.00</div>
+                                <div style="background:var(--color-surface); padding:10px; border-radius:6px;">
+                                    <div style="color:var(--color-text-secondary); font-size:11px;">Utilities</div>
+                                    <div style="font-weight:700; font-size:14px; color:var(--color-primary);" id="preview-utilities-cost">₹0.00</div>
                                 </div>
                             </div>
-                            <div style="background: var(--color-surface-light); padding: 12px; border-radius: 6px; font-size: 12px;">
-                                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--color-primary);">
+                            <div style="background:var(--color-surface-light); padding:12px; border-radius:6px; font-size:12px;">
+                                <div style="display:flex; justify-content:space-between; font-weight:700; color:var(--color-primary);">
                                     <span>TOTAL MAKING COST:</span>
                                     <span id="preview-total-cost">₹0.00</span>
                                 </div>
                             </div>
                         </div>
-                        <button class="btn btn-primary" onclick="saveRecipe()" style="margin-top: 16px;">Save Recipe</button>
+
+                        <div style="margin-top:12px;">
+                            <button class="btn btn-primary" onclick="saveRecipe()">Save Recipe</button>
+                        </div>
                     </div>
 
-                    <div style="margin-bottom: 16px;">
-                        <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Your Recipes</h2>
+                    <div style="margin-top:10px;">
+                        <h2 style="font-size:15px; margin-bottom:10px;">Your Recipes</h2>
                         <div id="recipes-list" class="dishes-list">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">🍽️</div>
-                                <div class="empty-state-title">No recipes yet</div>
-                            </div>
+                            <div class="empty-state"><div class="empty-state-icon">🍽️</div><div class="empty-state-title">No recipes yet</div></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- SETTINGS TAB -->
+            <!-- SETTINGS -->
             <div id="settings-tab" class="tab-content">
                 <div class="page-padding">
                     <div class="form-section">
                         <div class="form-section-title">🏪 SHOP/RESTAURANT LOCATION</div>
-                        <p style="font-size: 11px; color: var(--color-text-secondary); margin-bottom: 12px;">Costs for main dishes (Paneer Tikka, Curries, etc.)</p>
+                        <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;">Costs for main dishes (Paneer Tikka, Curries, etc.)</p>
                         <div class="form-group">
                             <label>Electricity (₹/month)</label>
                             <input type="number" id="shop-electricity" placeholder="0.00" step="0.01" value="0">
@@ -774,12 +291,12 @@
                             <label>Gas/Fuel (₹/month)</label>
                             <input type="number" id="shop-gas" placeholder="0.00" step="0.01" value="0">
                         </div>
-                        <button class="btn btn-primary" onclick="saveShopOverhead()">Save Shop Costs</button>
+                        <div style="margin-top:8px;"><button class="btn btn-primary" onclick="saveShopOverhead()">Save Shop Costs</button></div>
                     </div>
 
                     <div class="form-section">
                         <div class="form-section-title">🏭 FACTORY LOCATION (SWEETS)</div>
-                        <p style="font-size: 11px; color: var(--color-text-secondary); margin-bottom: 12px;">Costs for sweets only (Gulab Jamun, Laddu, etc.)</p>
+                        <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;">Costs for sweets only</p>
                         <div class="form-group">
                             <label>Electricity (₹/month)</label>
                             <input type="number" id="factory-electricity" placeholder="0.00" step="0.01" value="0">
@@ -788,25 +305,27 @@
                             <label>Gas/Fuel (₹/month)</label>
                             <input type="number" id="factory-gas" placeholder="0.00" step="0.01" value="0">
                         </div>
-                        <button class="btn btn-primary" onclick="saveFactoryOverhead()">Save Factory Costs</button>
+                        <div style="margin-top:8px;"><button class="btn btn-primary" onclick="saveFactoryOverhead()">Save Factory Costs</button></div>
                     </div>
 
                     <div class="form-section">
                         <div class="form-section-title">👥 STAFF PAYROLL (DEPARTMENT-WISE)</div>
-                        <div class="dept-stats">
-                            <div class="dept-stat">
-                                <div class="dept-stat-label">🍽️ Restaurant Staff</div>
-                                <div class="dept-stat-value" id="restaurant-staff-count">0</div>
-                                <div style="font-size: 11px; color: var(--color-text-secondary); margin-top: 4px;" id="restaurant-payroll">₹0/mo</div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                            <div style="background:var(--color-surface-light); padding:10px; border-radius:8px;">
+                                <div style="font-size:11px; color:var(--color-text-secondary);">🍽️ Restaurant Staff</div>
+                                <div style="font-weight:700; font-size:14px;" id="restaurant-staff-count">0</div>
+                                <div style="font-size:11px; color:var(--color-text-secondary);" id="restaurant-payroll">₹0/mo</div>
                             </div>
-                            <div class="dept-stat">
-                                <div class="dept-stat-label">🍬 Sweets Staff</div>
-                                <div class="dept-stat-value" id="sweets-staff-count">0</div>
-                                <div style="font-size: 11px; color: var(--color-text-secondary); margin-top: 4px;" id="sweets-payroll">₹0/mo</div>
+                            <div style="background:var(--color-surface-light); padding:10px; border-radius:8px;">
+                                <div style="font-size:11px; color:var(--color-text-secondary);">🍬 Sweets Staff</div>
+                                <div style="font-weight:700; font-size:14px;" id="sweets-staff-count">0</div>
+                                <div style="font-size:11px; color:var(--color-text-secondary);" id="sweets-payroll">₹0/mo</div>
                             </div>
                         </div>
-                        <button class="btn btn-secondary" onclick="openModal('staff-modal')" style="margin-bottom: 12px;">👥 Manage Staff</button>
-                        <button class="btn btn-secondary" onclick="openModal('bulk-staff-modal')">📤 Bulk Upload Staff</button>
+                        <div style="margin-bottom:10px;">
+                            <button class="btn btn-secondary" onclick="openModal('staff-modal')" style="margin-right:8px;">👥 Manage Staff</button>
+                            <button class="btn btn-secondary" onclick="openModal('bulk-staff-modal')">📤 Bulk Upload Staff</button>
+                        </div>
                     </div>
 
                     <div class="form-section">
@@ -815,65 +334,57 @@
                             <label>Desired Profit Margin %</label>
                             <input type="number" id="profit-margin-target" placeholder="30" min="0" max="1000" step="0.1" value="30">
                         </div>
-                        <button class="btn btn-primary" onclick="saveProfitMargin()">Save Target</button>
+                        <div style="margin-top:8px;"><button class="btn btn-primary" onclick="saveProfitMargin()">Save Target</button></div>
                     </div>
 
                     <div class="form-section">
                         <div class="form-section-title">Bulk Upload Menu</div>
-                        <p style="font-size: 12px; color: var(--color-text-secondary); margin-bottom: 12px;">Format: Dish Name, Category, Selling Price</p>
+                        <p style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Format: Dish Name, Category, Selling Price</p>
                         <textarea id="bulk-upload-data" placeholder="Paneer Tikka,restaurant,250&#10;Gulab Jamun,sweets,80"></textarea>
-                        <button class="btn btn-primary" onclick="bulkUploadMenu()" style="margin-top: 12px;">Upload Menu</button>
+                        <div style="margin-top:8px;"><button class="btn btn-primary" onclick="bulkUploadMenu()">Upload Menu</button></div>
                     </div>
 
                     <div class="form-section">
                         <div class="form-section-title">Data Management</div>
-                        <button class="btn btn-secondary" onclick="exportData()">📥 Export Backup</button>
-                        <button class="btn btn-secondary" onclick="triggerImport()" style="margin-top: 12px;">📤 Import Backup</button>
-                        <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importData()">
-                        <button class="btn btn-danger" onclick="clearAllData()" style="margin-top: 12px;">⚠️ Clear All Data</button>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" onclick="exportData()">📥 Export Backup</button>
+                            <button class="btn btn-secondary" onclick="triggerImport()">📤 Import Backup</button>
+                            <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+                            <button class="btn btn-danger" onclick="clearAllData()">⚠️ Clear All Data</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="bottom-nav">
-            <button class="nav-item active" onclick="switchTab('dashboard')">
-                <div class="nav-icon">📊</div>
-                <div>Dashboard</div>
-            </button>
-            <button class="nav-item" onclick="switchTab('ingredients')">
-                <div class="nav-icon">📦</div>
-                <div>Ingredients</div>
-            </button>
-            <button class="nav-item" onclick="switchTab('recipes')">
-                <div class="nav-icon">🍽️</div>
-                <div>Recipes</div>
-            </button>
-            <button class="nav-item" onclick="switchTab('settings')">
-                <div class="nav-icon">⚙️</div>
-                <div>Settings</div>
-            </button>
+            <button class="nav-item active" onclick="switchTab('dashboard')">📊<div>Dashboard</div></button>
+            <button class="nav-item" onclick="switchTab('ingredients')">📦<div>Ingredients</div></button>
+            <button class="nav-item" onclick="switchTab('recipes')">🍽️<div>Recipes</div></button>
+            <button class="nav-item" onclick="switchTab('settings')">⚙️<div>Settings</div></button>
         </div>
     </div>
 
     <!-- Ingredient Selector Modal -->
     <div id="ingredient-selector-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span>Select Ingredients</span>
-                <button class="modal-close" onclick="closeModal('ingredient-selector-modal')">×</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Select Ingredients</strong>
+                <button class="btn btn-secondary" onclick="closeModal('ingredient-selector-modal')">Close</button>
             </div>
             <div id="ingredient-selector-list"></div>
-            <button class="btn btn-primary" onclick="closeModal('ingredient-selector-modal')" style="margin-top: 16px;">Done</button>
+            <div style="margin-top:10px;">
+                <button class="btn btn-primary" onclick="closeModal('ingredient-selector-modal')">Done</button>
+            </div>
         </div>
     </div>
 
     <!-- Edit Recipe Modal -->
     <div id="edit-recipe-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span>Edit Recipe</span>
-                <button class="modal-close" onclick="closeModal('edit-recipe-modal')">×</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Edit Recipe</strong>
+                <button class="btn btn-secondary" onclick="closeModal('edit-recipe-modal')">Close</button>
             </div>
             <div class="form-group">
                 <label>Selling Price (₹)</label>
@@ -887,73 +398,61 @@
                 <label>Daily Production</label>
                 <input type="number" id="edit-recipe-daily-volume" placeholder="50" min="1" step="1">
             </div>
-            <div class="btn-group" style="margin-top: 20px;">
+            <div style="display:flex; gap:8px; margin-top:12px;">
                 <button class="btn btn-primary" onclick="updateRecipe()">Save</button>
                 <button class="btn btn-danger" onclick="deleteRecipe()">Delete</button>
             </div>
         </div>
     </div>
 
-    <!-- Staff Management Modal -->
+    <!-- Staff Modal -->
     <div id="staff-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span>Staff Payroll Management</span>
-                <button class="modal-close" onclick="closeModal('staff-modal')">×</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Staff Payroll Management</strong>
+                <button class="btn btn-secondary" onclick="closeModal('staff-modal')">Close</button>
             </div>
-            
-            <div style="margin-bottom: 16px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; font-size: 11px;">
-                    <input type="text" id="staff-name" placeholder="Name/ID" style="padding: 8px;">
-                    <input type="tel" id="staff-phone" placeholder="Phone" style="padding: 8px;">
+
+            <div style="display:grid; gap:8px; margin-bottom:12px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <input type="text" id="staff-name" placeholder="Name/ID">
+                    <input type="tel" id="staff-phone" placeholder="Phone">
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; font-size: 11px;">
-                    <select id="staff-department" style="padding: 8px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <select id="staff-department">
                         <option value="restaurant">🍽️ Restaurant</option>
                         <option value="sweets">🍬 Sweets</option>
                     </select>
-                    <input type="text" id="staff-designation" placeholder="Designation" style="padding: 8px;">
+                    <input type="text" id="staff-designation" placeholder="Designation">
                 </div>
-                <input type="number" id="staff-salary" placeholder="Monthly Salary" step="0.01" style="padding: 8px; margin-bottom: 12px; font-size: 11px;">
-                <button class="btn btn-secondary btn-small" onclick="addStaffMember()" style="width: 100%;">Add Staff</button>
+                <input type="number" id="staff-salary" placeholder="Monthly Salary" step="0.01">
+                <button class="btn btn-secondary" onclick="addStaffMember()">Add Staff</button>
             </div>
 
-            <div style="margin-bottom: 16px;">
-                <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px;">Staff List</h3>
-                <div class="table-container">
+            <div>
+                <h3 style="font-size:14px; margin-bottom:8px;">Staff List</h3>
+                <div style="overflow-x:auto;">
                     <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Dept</th>
-                                <th>Salary</th>
-                                <th>Phone</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
+                        <thead><tr><th>Name</th><th>Dept</th><th>Salary</th><th>Phone</th><th>Action</th></tr></thead>
                         <tbody id="staff-table-body"></tbody>
                     </table>
                 </div>
             </div>
-
-            <button class="btn btn-primary" onclick="closeModal('staff-modal')">Done</button>
         </div>
     </div>
 
-    <!-- Bulk Upload Staff Modal -->
+    <!-- Bulk Staff -->
     <div id="bulk-staff-modal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <span>Bulk Upload Staff</span>
-                <button class="modal-close" onclick="closeModal('bulk-staff-modal')">×</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong>Bulk Upload Staff</strong>
+                <button class="btn btn-secondary" onclick="closeModal('bulk-staff-modal')">Close</button>
             </div>
-            
-            <div class="form-group">
-                <label style="font-size: 12px;">Format: Name, Department, Designation, Phone, Monthly Salary</label>
-                <textarea id="bulk-staff-data" placeholder="Chef Raj,restaurant,Head Chef,9876543210,30000&#10;Pastry Chef,sweets,Head Chef,9876543212,28000" style="min-height: 120px; font-size: 12px;"></textarea>
+            <div>
+                <label style="font-size:12px;">Format: Name, Department, Designation, Phone, Monthly Salary</label>
+                <textarea id="bulk-staff-data" placeholder="Chef Raj,restaurant,Head Chef,9876543210,30000&#10;Pastry Chef,sweets,Head Chef,9876543212,28000" style="min-height:120px; font-size:13px;"></textarea>
             </div>
-
-            <div class="btn-group">
+            <div style="display:flex; gap:8px; margin-top:10px;">
                 <button class="btn btn-primary" onclick="bulkUploadStaff()">Upload</button>
                 <button class="btn btn-secondary" onclick="closeModal('bulk-staff-modal')">Cancel</button>
             </div>
@@ -961,6 +460,7 @@
     </div>
 
     <script>
+        // STORAGE KEYS + DEFAULTS
         const STORAGE_KEYS = {
             ingredients: 'restaurant_ingredients',
             recipes: 'restaurant_recipes',
@@ -969,703 +469,532 @@
             staff: 'restaurant_staff',
             profitMargin: 'restaurant_profit_margin'
         };
-
         const DEFAULT_PROFIT_MARGIN = 30;
 
-        function loadData() {
-            return {
-                ingredients: JSON.parse(localStorage.getItem(STORAGE_KEYS.ingredients) || '{}'),
-                recipes: JSON.parse(localStorage.getItem(STORAGE_KEYS.recipes) || '{}'),
-                shop_overhead: JSON.parse(localStorage.getItem(STORAGE_KEYS.shop_overhead) || { electricity: 0, gas: 0 }),
-                factory_overhead: JSON.parse(localStorage.getItem(STORAGE_KEYS.factory_overhead) || { electricity: 0, gas: 0 }),
-                staff: JSON.parse(localStorage.getItem(STORAGE_KEYS.staff) || '{}'),
-                profitMargin: parseFloat(localStorage.getItem(STORAGE_KEYS.profitMargin) || DEFAULT_PROFIT_MARGIN)
-            };
+        // Safe parse helper. Only parse if raw string exists; fallback to provided default.
+        function safeGetParsed(storageKey, fallback){
+            try{
+                const raw = localStorage.getItem(storageKey);
+                if (!raw) return fallback;
+                return JSON.parse(raw);
+            }catch(err){
+                console.warn('safeGetParsed() parse failed for', storageKey, err);
+                return fallback;
+            }
         }
 
-        function saveAllData(data) {
+        // Robust loadData
+        function loadData(){
+            const ingredients = safeGetParsed(STORAGE_KEYS.ingredients, {});
+            const recipes = safeGetParsed(STORAGE_KEYS.recipes, {});
+            const shop_overhead = safeGetParsed(STORAGE_KEYS.shop_overhead, { electricity:0, gas:0 });
+            const factory_overhead = safeGetParsed(STORAGE_KEYS.factory_overhead, { electricity:0, gas:0 });
+            const staff = safeGetParsed(STORAGE_KEYS.staff, {});
+            const rawProfit = parseFloat(localStorage.getItem(STORAGE_KEYS.profitMargin));
+            const profitMargin = isNaN(rawProfit) ? DEFAULT_PROFIT_MARGIN : rawProfit;
+            return { ingredients, recipes, shop_overhead, factory_overhead, staff, profitMargin };
+        }
+
+        function saveAllData(data){
             localStorage.setItem(STORAGE_KEYS.ingredients, JSON.stringify(data.ingredients));
             localStorage.setItem(STORAGE_KEYS.recipes, JSON.stringify(data.recipes));
             localStorage.setItem(STORAGE_KEYS.shop_overhead, JSON.stringify(data.shop_overhead));
             localStorage.setItem(STORAGE_KEYS.factory_overhead, JSON.stringify(data.factory_overhead));
             localStorage.setItem(STORAGE_KEYS.staff, JSON.stringify(data.staff));
-            localStorage.setItem(STORAGE_KEYS.profitMargin, data.profitMargin.toString());
+            localStorage.setItem(STORAGE_KEYS.profitMargin, (data.profitMargin||DEFAULT_PROFIT_MARGIN).toString());
         }
 
-        // ==================== INGREDIENT FUNCTIONS ====================
-        function addIngredient() {
+        // App state
+        let DATA = loadData();
+        let currentRecipeIngredients = []; // temp list during recipe creation
+        let selectedEditRecipeId = null;
+
+        // Utilities
+        function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+        function formatCurrency(n){ return '₹' + (isNaN(n) ? '0.00' : Number(n).toFixed(2)); }
+
+        // ------------------ RENDER FUNCTIONS ------------------
+        function updateDashboard(){
+            const recipesCount = Object.keys(DATA.recipes || {}).length;
+            const staffCount = Object.keys(DATA.staff || {}).length;
+            document.getElementById('stat-recipes').innerText = recipesCount;
+            document.getElementById('stat-total-staff').innerText = staffCount;
+
+            // avg profit: compute simple average (selling - cost)/selling * 100
+            const recipeVals = Object.values(DATA.recipes || {});
+            let avgProfit = 0, red = 0;
+            recipeVals.forEach(r => {
+                const cost = computeRecipeCost(r);
+                const profitPct = r.sellingPrice ? ((r.sellingPrice - cost)/r.sellingPrice)*100 : 0;
+                avgProfit += profitPct;
+                if (profitPct < (DATA.profitMargin || DEFAULT_PROFIT_MARGIN)) red++;
+            });
+            avgProfit = recipeVals.length ? (avgProfit/recipeVals.length) : 0;
+            document.getElementById('stat-avg-profit').innerText = avgProfit.toFixed(1) + '%';
+            document.getElementById('stat-red-dishes').innerText = red;
+        }
+
+        function renderIngredientsTable(){
+            const tbody = document.getElementById('ingredients-table-body');
+            tbody.innerHTML = '';
+            const ingredients = DATA.ingredients || {};
+            const keys = Object.keys(ingredients);
+            if (keys.length === 0){
+                document.getElementById('ingredients-empty').style.display = 'block';
+            } else {
+                document.getElementById('ingredients-empty').style.display = 'none';
+            }
+            keys.forEach(id => {
+                const ing = ingredients[id];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(ing.name)}</td><td>${escapeHtml(ing.unit)}</td><td>${formatCurrency(ing.price)}</td>
+                    <td><button class="btn btn-secondary" onclick="deleteIngredient('${id}')">Delete</button></td>`;
+                tbody.appendChild(tr);
+            });
+            renderIngredientSelectorList();
+        }
+
+        function renderRecipesList(){
+            const list = document.getElementById('recipes-list');
+            list.innerHTML = '';
+            const recipes = DATA.recipes || {};
+            const keys = Object.keys(recipes);
+            if (keys.length === 0){
+                list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🍽️</div><div class="empty-state-title">No recipes yet</div></div>`;
+                return;
+            }
+            keys.forEach(id => {
+                const r = recipes[id];
+                const cost = computeRecipeCost(r);
+                const profitPct = r.sellingPrice ? ((r.sellingPrice - cost)/r.sellingPrice)*100 : 0;
+                const row = document.createElement('div');
+                row.className = 'dish-row';
+                row.onclick = () => openEditRecipeModal(id);
+                row.innerHTML = `<div class="dish-name">${escapeHtml(r.name)} <span style="font-size:12px; color:var(--color-text-secondary); margin-left:8px;">(${escapeHtml(r.category)})</span></div>
+                    <div class="dish-details">
+                        <div><div class="detail-item"><span class="detail-label">Cost</span><span class="detail-value">${formatCurrency(cost)}</span></div></div>
+                        <div><div class="detail-item"><span class="detail-label">Selling</span><span class="detail-value">${formatCurrency(r.sellingPrice||0)}</span></div></div>
+                    </div>
+                    <div class="profit-margin ${profitPct>=0?'positive':''}" style="margin-top:8px;">Profit ${profitPct.toFixed(1)}%</div>`;
+                list.appendChild(row);
+            });
+        }
+
+        // Ingredient selector (modal) list
+        function renderIngredientSelectorList(){
+            const container = document.getElementById('ingredient-selector-list');
+            container.innerHTML = '';
+            const ingredients = DATA.ingredients || {};
+            const keys = Object.keys(ingredients);
+            if (keys.length === 0){
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📦</div><div class="empty-state-title">No ingredients available</div></div>';
+                return;
+            }
+            keys.forEach(id => {
+                const ing = ingredients[id];
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.justifyContent = 'space-between';
+                wrapper.style.padding = '8px';
+                wrapper.style.borderBottom = '1px solid var(--color-border)';
+                wrapper.innerHTML = `<div style="flex:1;">
+                        <div style="font-weight:600">${escapeHtml(ing.name)} <small style="color:var(--color-text-secondary);">(${escapeHtml(ing.unit)})</small></div>
+                        <div style="font-size:12px; color:var(--color-text-secondary)">${formatCurrency(ing.price)} per ${escapeHtml(ing.unit)}</div>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="number" min="0" placeholder="qty" style="width:80px; padding:6px;" id="sel-${id}-qty">
+                        <button class="btn btn-primary" onclick="selectIngredientForRecipe('${id}')">Add</button>
+                    </div>`;
+                container.appendChild(wrapper);
+            });
+        }
+
+        // Staff render
+        function renderStaffTable(){
+            const tbody = document.getElementById('staff-table-body');
+            tbody.innerHTML = '';
+            const staff = DATA.staff || {};
+            const keys = Object.keys(staff);
+            keys.forEach(id => {
+                const s = staff[id];
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.department)}</td><td>${formatCurrency(s.salary)}</td><td>${escapeHtml(s.phone||'')}</td>
+                    <td><button class="btn btn-secondary" onclick="removeStaff('${id}')">Remove</button></td>`;
+                tbody.appendChild(tr);
+            });
+            // update payroll counts
+            const staffVals = Object.values(staff);
+            const restaurant = staffVals.filter(s=>s.department==='restaurant');
+            const sweets = staffVals.filter(s=>s.department==='sweets');
+            const restaurantPayroll = restaurant.reduce((a,b)=>a+(parseFloat(b.salary)||0),0);
+            const sweetsPayroll = sweets.reduce((a,b)=>a+(parseFloat(b.salary)||0),0);
+            document.getElementById('restaurant-staff-count').innerText = restaurant.length;
+            document.getElementById('sweets-staff-count').innerText = sweets.length;
+            document.getElementById('restaurant-payroll').innerText = formatCurrency(restaurantPayroll) + '/mo';
+            document.getElementById('sweets-payroll').innerText = formatCurrency(sweetsPayroll) + '/mo';
+            document.getElementById('stat-total-staff').innerText = keys.length;
+        }
+
+        // ------------------ CORE FUNCTIONALITY ------------------
+        // Ingredients
+        function addIngredient(){
             const name = document.getElementById('ingredient-name').value.trim();
             const unit = document.getElementById('ingredient-unit').value;
             const price = parseFloat(document.getElementById('ingredient-price').value);
-
-            if (!name || isNaN(price) || price < 0) {
-                showAlert('Please enter valid details', 'error');
-                return;
-            }
-
-            const data = loadData();
-            data.ingredients['ing_' + Date.now()] = { id: 'ing_' + Date.now(), name, unit, price };
-            saveAllData(data);
+            if (!name || isNaN(price)) { alert('Please enter valid name and price'); return; }
+            const id = uid();
+            DATA.ingredients[id] = { id, name, unit, price };
+            saveAllData(DATA);
+            renderIngredientsTable();
             document.getElementById('ingredient-name').value = '';
             document.getElementById('ingredient-price').value = '';
-            updateIngredientsList();
-            showAlert('Ingredient added', 'success');
         }
 
-        function updateIngredientsList() {
-            const data = loadData();
-            const tbody = document.getElementById('ingredients-table-body');
-            tbody.innerHTML = '';
-
-            if (Object.keys(data.ingredients).length === 0) {
-                document.getElementById('ingredients-empty').style.display = 'block';
-                return;
-            }
-
-            document.getElementById('ingredients-empty').style.display = 'none';
-            Object.values(data.ingredients).forEach(ing => {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td>${ing.name}</td><td>${ing.unit}</td><td>₹${ing.price.toFixed(2)}</td><td><button class="btn btn-small" onclick="deleteIngredient('${ing.id}')">Del</button></td>`;
-                tbody.appendChild(row);
-            });
+        function deleteIngredient(id){
+            if (!confirm('Delete ingredient?')) return;
+            delete DATA.ingredients[id];
+            saveAllData(DATA);
+            renderIngredientsTable();
         }
 
-        function deleteIngredient(id) {
-            if (confirm('Delete?')) {
-                const data = loadData();
-                delete data.ingredients[id];
-                saveAllData(data);
-                updateIngredientsList();
-                updateRecipesDisplay();
-            }
-        }
-
-        // ==================== OVERHEAD FUNCTIONS ====================
-        function saveShopOverhead() {
-            const data = loadData();
-            data.shop_overhead = {
-                electricity: parseFloat(document.getElementById('shop-electricity').value) || 0,
-                gas: parseFloat(document.getElementById('shop-gas').value) || 0
-            };
-            saveAllData(data);
-            updateRecipesDisplay();
-            updateDashboard();
-            showAlert('Shop costs saved', 'success');
-        }
-
-        function saveFactoryOverhead() {
-            const data = loadData();
-            data.factory_overhead = {
-                electricity: parseFloat(document.getElementById('factory-electricity').value) || 0,
-                gas: parseFloat(document.getElementById('factory-gas').value) || 0
-            };
-            saveAllData(data);
-            updateRecipesDisplay();
-            updateDashboard();
-            showAlert('Factory costs saved', 'success');
-        }
-
-        function getLocationDailyUtilities(category) {
-            const data = loadData();
-            const overhead = category === 'sweets' ? data.factory_overhead : data.shop_overhead;
-            const total = (overhead.electricity || 0) + (overhead.gas || 0);
-            return total / 30;
-        }
-
-        function getDepartmentDailyLabour(dept) {
-            const data = loadData();
-            const staff = Object.values(data.staff).filter(s => s.department === dept);
-            const totalSalary = staff.reduce((sum, s) => sum + (s.salary || 0), 0);
-            return totalSalary / 30;
-        }
-
-        function loadOverheadFields() {
-            const data = loadData();
-            document.getElementById('shop-electricity').value = data.shop_overhead.electricity || 0;
-            document.getElementById('shop-gas').value = data.shop_overhead.gas || 0;
-            document.getElementById('factory-electricity').value = data.factory_overhead.electricity || 0;
-            document.getElementById('factory-gas').value = data.factory_overhead.gas || 0;
-            updateStaffDisplay();
-        }
-
-        // ==================== STAFF FUNCTIONS ====================
-        function addStaffMember() {
-            const name = document.getElementById('staff-name').value.trim();
-            const phone = document.getElementById('staff-phone').value.trim();
-            const department = document.getElementById('staff-department').value;
-            const designation = document.getElementById('staff-designation').value.trim();
-            const salary = parseFloat(document.getElementById('staff-salary').value);
-
-            if (!name || !designation || isNaN(salary) || salary <= 0) {
-                showAlert('Please fill all required fields', 'error');
-                return;
-            }
-
-            const data = loadData();
-            const id = 'staff_' + Date.now();
-            data.staff[id] = { id, name, phone, department, designation, salary };
-            saveAllData(data);
-            document.getElementById('staff-name').value = '';
-            document.getElementById('staff-phone').value = '';
-            document.getElementById('staff-designation').value = '';
-            document.getElementById('staff-salary').value = '';
-            updateStaffDisplay();
-            updateRecipesDisplay();
-            updateDashboard();
-            showAlert('Staff added', 'success');
-        }
-
-        function deleteStaffMember(id) {
-            if (confirm('Delete staff?')) {
-                const data = loadData();
-                delete data.staff[id];
-                saveAllData(data);
-                updateStaffDisplay();
-                updateRecipesDisplay();
-                updateDashboard();
-            }
-        }
-
-        function updateStaffDisplay() {
-            const data = loadData();
-            const restaurantStaff = Object.values(data.staff).filter(s => s.department === 'restaurant');
-            const sweetsStaff = Object.values(data.staff).filter(s => s.department === 'sweets');
-            
-            const restaurantPayroll = restaurantStaff.reduce((sum, s) => sum + (s.salary || 0), 0);
-            const sweetsPayroll = sweetsStaff.reduce((sum, s) => sum + (s.salary || 0), 0);
-
-            document.getElementById('restaurant-staff-count').textContent = restaurantStaff.length;
-            document.getElementById('sweets-staff-count').textContent = sweetsStaff.length;
-            document.getElementById('restaurant-payroll').textContent = '₹' + restaurantPayroll.toFixed(0) + '/mo';
-            document.getElementById('sweets-payroll').textContent = '₹' + sweetsPayroll.toFixed(0) + '/mo';
-
-            const tbody = document.getElementById('staff-table-body');
-            tbody.innerHTML = '';
-            Object.values(data.staff).forEach(s => {
-                const row = document.createElement('tr');
-                const deptBadge = s.department === 'restaurant' ? '🍽️' : '🍬';
-                row.innerHTML = `<td>${s.name}</td><td>${deptBadge}</td><td>₹${s.salary.toFixed(0)}</td><td>${s.phone || '-'}</td><td><button class="btn btn-small" onclick="deleteStaffMember('${s.id}')">Del</button></td>`;
-                tbody.appendChild(row);
-            });
-        }
-
-        function bulkUploadStaff() {
-            const csvData = document.getElementById('bulk-staff-data').value.trim();
-            if (!csvData) {
-                showAlert('Please enter staff data', 'error');
-                return;
-            }
-
-            const data = loadData();
-            const lines = csvData.split('\n');
-            let added = 0;
-
-            lines.forEach(line => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 5) {
-                    const name = parts[0];
-                    const department = parts[1].toLowerCase();
-                    const designation = parts[2];
-                    const phone = parts[3];
-                    const salary = parseFloat(parts[4]);
-
-                    if (name && (department === 'restaurant' || department === 'sweets') && designation && !isNaN(salary) && salary > 0) {
-                        const id = 'staff_' + Date.now() + '_' + added;
-                        data.staff[id] = { id, name, phone, department, designation, salary };
-                        added++;
-                    }
-                }
-            });
-
-            if (added > 0) {
-                saveAllData(data);
-                document.getElementById('bulk-staff-data').value = '';
-                updateStaffDisplay();
-                updateRecipesDisplay();
-                updateDashboard();
-                closeModal('bulk-staff-modal');
-                showAlert(`Added ${added} staff`, 'success');
-            } else {
-                showAlert('No valid entries', 'error');
-            }
-        }
-
-        // ==================== PROFIT MARGIN ====================
-        function saveProfitMargin() {
-            const data = loadData();
-            data.profitMargin = parseFloat(document.getElementById('profit-margin-target').value) || DEFAULT_PROFIT_MARGIN;
-            saveAllData(data);
-            updateRecipesDisplay();
-            updateDashboard();
-            showAlert('Profit target saved', 'success');
-        }
-
-        function loadProfitMarginField() {
-            const data = loadData();
-            document.getElementById('profit-margin-target').value = data.profitMargin;
-        }
-
-        // ==================== RECIPE FUNCTIONS ====================
-        let currentRecipeIngredients = {};
-
-        function openIngredientSelector() {
-            const data = loadData();
-            const list = document.getElementById('ingredient-selector-list');
-            list.innerHTML = '';
-
-            if (Object.keys(data.ingredients).length === 0) {
-                list.innerHTML = '<div style="padding: 20px; text-align: center;">No ingredients</div>';
-                openModal('ingredient-selector-modal');
-                return;
-            }
-
-            Object.values(data.ingredients).forEach(ing => {
-                const isSelected = ing.id in currentRecipeIngredients;
-                const div = document.createElement('div');
-                div.style.cssText = 'background: var(--color-surface-light); padding: 12px; border-radius: 8px; font-size: 12px; margin-bottom: 8px;';
-                div.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
-                        <div style="flex: 1;"><div style="font-weight: 600;">${ing.name}</div><div style="font-size: 10px; color: var(--color-text-secondary);">₹${ing.price.toFixed(2)}/${ing.unit}</div></div>
-                        <div style="display: flex; align-items: center; gap: 6px;"><input type="number" placeholder="Qty" step="0.01" value="${isSelected ? currentRecipeIngredients[ing.id] : ''}" style="width: 60px; padding: 6px; font-size: 11px;" onchange="updateRecipeIngredientQty('${ing.id}', this.value)" oninput="updateRecipeIngredientQty('${ing.id}', this.value)"><span style="font-size: 10px; min-width: 25px;">${ing.unit}</span></div>
-                    </div>
-                `;
-                list.appendChild(div);
-            });
+        // Open ingredient selector
+        function openIngredientSelector(){
+            renderIngredientSelectorList();
             openModal('ingredient-selector-modal');
         }
 
-        function updateRecipeIngredientQty(id, qty) {
-            const quantity = parseFloat(qty);
-            if (quantity > 0) currentRecipeIngredients[id] = quantity;
-            else delete currentRecipeIngredients[id];
-            updateRecipeIngredientsList();
-            updateRecipeCostPreview();
+        function selectIngredientForRecipe(ingredientId){
+            const qtyEl = document.getElementById(`sel-${ingredientId}-qty`);
+            const qty = parseFloat(qtyEl ? qtyEl.value : 0);
+            if (!qty || qty <= 0){ alert('Enter quantity'); return; }
+            const ing = DATA.ingredients[ingredientId];
+            if (!ing) { alert('Ingredient not found'); return; }
+            // Push to current recipe list
+            currentRecipeIngredients.push({ id: ingredientId, qty, name: ing.name, unit: ing.unit, price: ing.price });
+            renderRecipeIngredientsPreview();
+            // clear input
+            if (qtyEl) qtyEl.value = '';
         }
 
-        function updateRecipeIngredientsList() {
-            const data = loadData();
-            const list = document.getElementById('recipe-ingredients-list');
-            list.innerHTML = '';
-
-            if (Object.keys(currentRecipeIngredients).length === 0) {
-                list.innerHTML = '<p style="font-size: 12px; color: var(--color-text-secondary);">No ingredients</p>';
-                return;
-            }
-
-            Object.entries(currentRecipeIngredients).forEach(([ingId, qty]) => {
-                const ing = data.ingredients[ingId];
-                if (ing) {
-                    const div = document.createElement('div');
-                    div.style.cssText = 'display: flex; justify-content: space-between; padding: 8px; background: var(--color-surface-light); border-radius: 6px; margin-bottom: 8px; font-size: 12px;';
-                    div.innerHTML = `<span>${ing.name} × ${qty} ${ing.unit}</span><button class="btn btn-small" onclick="removeRecipeIngredient('${ingId}')">Remove</button>`;
-                    list.appendChild(div);
-                }
+        function renderRecipeIngredientsPreview(){
+            const container = document.getElementById('recipe-ingredients-list');
+            container.innerHTML = '';
+            currentRecipeIngredients.forEach((it, idx) => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.justifyContent = 'space-between';
+                row.style.alignItems = 'center';
+                row.style.padding = '8px';
+                row.style.border = '1px solid var(--color-border)';
+                row.style.borderRadius = '8px';
+                row.style.marginBottom = '8px';
+                row.innerHTML = `<div>
+                    <div style="font-weight:700">${escapeHtml(it.name)} <small style="color:var(--color-text-secondary)">(${escapeHtml(it.unit)})</small></div>
+                    <div style="font-size:12px; color:var(--color-text-secondary)">${it.qty} × ${formatCurrency(it.price)} = ${formatCurrency(it.qty * it.price)}</div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="removeRecipeIngredient(${idx})">Remove</button>
+                </div>`;
+                container.appendChild(row);
             });
+            updateRecipePreviewCosts();
         }
 
-        function removeRecipeIngredient(id) {
-            delete currentRecipeIngredients[id];
-            updateRecipeIngredientsList();
-            updateRecipeCostPreview();
+        function removeRecipeIngredient(index){
+            currentRecipeIngredients.splice(index,1);
+            renderRecipeIngredientsPreview();
         }
 
-        function updateRecipeCostPreview() {
-            const data = loadData();
-            const wastage = parseFloat(document.getElementById('recipe-wastage').value) || 10;
-            const dailyVolume = parseInt(document.getElementById('recipe-daily-volume').value) || 50;
-            const category = document.getElementById('recipe-category').value || 'restaurant';
-            
-            const tempRecipe = { ingredients: currentRecipeIngredients, wastage, dailyVolume, category };
-            const costs = calculateRecipeCost(tempRecipe, data);
-            
-            document.getElementById('preview-raw-cost').textContent = '₹' + costs.ingredientCost.toFixed(2);
-            document.getElementById('preview-wastage-cost').textContent = '₹' + costs.wastageAmount.toFixed(2);
-            document.getElementById('preview-labour-cost').textContent = '₹' + costs.labourPerUnit.toFixed(2);
-            document.getElementById('preview-utilities-cost').textContent = '₹' + costs.utilitiesPerUnit.toFixed(2);
-            document.getElementById('preview-total-cost').textContent = '₹' + costs.totalMakingCost.toFixed(2);
+        // Compute recipe cost (raw + wastage + simple labour/utilities allocation)
+        function computeRecipeCost(recipe){
+            // recipe may be stored with ingredients array or be a created recipe object
+            const ingredients = recipe.ingredients || [];
+            const rawCost = ingredients.reduce((sum, it) => {
+                const price = (it.price === undefined) ? (DATA.ingredients[it.id]?.price || 0) : it.price;
+                const qty = parseFloat(it.qty) || 0;
+                return sum + (qty * price);
+            }, 0);
+            const wastagePct = parseFloat(recipe.wastage) || 0;
+            const wastageCost = rawCost * (wastagePct/100);
+            // naive labour/utilities allocation: distribute monthly overhead per dailyVolume
+            const dailyVol = parseFloat(recipe.dailyVolume) || 1;
+            // monthly staff payroll for department
+            const staffVals = Object.values(DATA.staff || {});
+            const totalPayroll = staffVals.reduce((a,b)=>a+(parseFloat(b.salary)||0),0);
+            const shopOver = DATA.shop_overhead || { electricity:0, gas:0 };
+            const factoryOver = DATA.factory_overhead || { electricity:0, gas:0 };
+            // distribute monthly overhead across an assumed 30 days and across production volume
+            const monthlyOverhead = ( (recipe.category==='sweets') ? (factoryOver.electricity||0)+(factoryOver.gas||0) : (shopOver.electricity||0)+(shopOver.gas||0) ) + totalPayroll;
+            const perItemOverhead = (monthlyOverhead / 30) / Math.max(1, dailyVol);
+            const labour = perItemOverhead * 0.6; // simple split
+            const utilities = perItemOverhead * 0.4;
+            const total = rawCost + wastageCost + labour + utilities;
+            return total;
         }
 
-        function calculateRecipeCost(recipe, data) {
-            let ingredientCost = 0;
-            let ingredientBreakdown = [];
-
-            Object.entries(recipe.ingredients).forEach(([ingId, qty]) => {
-                const ing = data.ingredients[ingId];
-                if (ing) {
-                    let quantityInBaseUnit = qty;
-                    if ((ing.unit === 'kg' || ing.unit === 'L') && qty < 1) quantityInBaseUnit = qty / 1000;
-                    const cost = quantityInBaseUnit * ing.price;
-                    ingredientCost += cost;
-                    ingredientBreakdown.push({ name: ing.name, qty, unit: ing.unit, cost });
-                }
-            });
-
-            const wastageAmount = ingredientCost * (recipe.wastage / 100);
-            const costWithWastage = ingredientCost + wastageAmount;
-            
-            const labourDaily = getDepartmentDailyLabour(recipe.category || 'restaurant');
-            const labourPerUnit = labourDaily / (recipe.dailyVolume || 1);
-            
-            const utilitiesDaily = getLocationDailyUtilities(recipe.category || 'restaurant');
-            const utilitiesPerUnit = utilitiesDaily / (recipe.dailyVolume || 1);
-            
-            const totalMakingCost = costWithWastage + labourPerUnit + utilitiesPerUnit;
-
-            return { 
-                ingredientCost, 
-                ingredientBreakdown, 
-                wastageAmount, 
-                costWithWastage, 
-                labourPerUnit,
-                utilitiesPerUnit,
-                totalMakingCost 
-            };
+        function updateRecipePreviewCosts(){
+            const rawCost = currentRecipeIngredients.reduce((s,it)=>s + (it.qty * it.price), 0);
+            const wastage = rawCost * (parseFloat(document.getElementById('recipe-wastage').value || 0)/100);
+            // simple labour/utilities placeholders
+            const labour = 0;
+            const utilities = 0;
+            const total = rawCost + wastage + labour + utilities;
+            document.getElementById('preview-raw-cost').innerText = formatCurrency(rawCost);
+            document.getElementById('preview-wastage-cost').innerText = formatCurrency(wastage);
+            document.getElementById('preview-labour-cost').innerText = formatCurrency(labour);
+            document.getElementById('preview-utilities-cost').innerText = formatCurrency(utilities);
+            document.getElementById('preview-total-cost').innerText = formatCurrency(total);
         }
 
-        function saveRecipe() {
+        // Save recipe
+        function saveRecipe(){
             const name = document.getElementById('recipe-name').value.trim();
             const category = document.getElementById('recipe-category').value;
-            const sellingPrice = parseFloat(document.getElementById('recipe-selling-price').value);
-            const wastage = parseFloat(document.getElementById('recipe-wastage').value) || 10;
-            const dailyVolume = parseInt(document.getElementById('recipe-daily-volume').value) || 50;
-
-            if (!name || isNaN(sellingPrice) || sellingPrice < 0 || Object.keys(currentRecipeIngredients).length === 0) {
-                showAlert('Please fill all fields', 'error');
-                return;
-            }
-
-            const data = loadData();
-            const id = 'rec_' + Date.now();
-            data.recipes[id] = { id, name, category, sellingPrice, wastage, dailyVolume, ingredients: { ...currentRecipeIngredients } };
-            saveAllData(data);
-
+            const sellingPrice = parseFloat(document.getElementById('recipe-selling-price').value) || 0;
+            const wastage = parseFloat(document.getElementById('recipe-wastage').value) || 0;
+            const dailyVolume = parseFloat(document.getElementById('recipe-daily-volume').value) || 1;
+            if (!name){ alert('Enter dish name'); return; }
+            if (!currentRecipeIngredients.length){ if(!confirm('No ingredients added. Save recipe without ingredients?')) return; }
+            const id = uid();
+            // store simplified ingredient info (id, qty, price snapshot)
+            const ingredients = currentRecipeIngredients.map(it => ({ id: it.id, qty: it.qty, price: it.price, name: it.name, unit: it.unit }));
+            DATA.recipes[id] = { id, name, category, sellingPrice, wastage, dailyVolume, ingredients };
+            saveAllData(DATA);
+            // reset inputs
             document.getElementById('recipe-name').value = '';
-            document.getElementById('recipe-category').value = 'restaurant';
             document.getElementById('recipe-selling-price').value = '';
-            document.getElementById('recipe-wastage').value = '10';
-            document.getElementById('recipe-daily-volume').value = '50';
-            currentRecipeIngredients = {};
-            updateRecipeIngredientsList();
-            updateRecipesDisplay();
+            currentRecipeIngredients = [];
+            renderRecipeIngredientsPreview();
+            renderRecipesList();
             updateDashboard();
-            showAlert('Recipe saved', 'success');
+            alert('Recipe saved');
         }
 
-        let editingRecipeId = null;
-
-        function openEditRecipe(id) {
-            const data = loadData();
-            const recipe = data.recipes[id];
-            if (!recipe) return;
-            editingRecipeId = id;
-            document.getElementById('edit-recipe-selling-price').value = recipe.sellingPrice;
-            document.getElementById('edit-recipe-wastage').value = recipe.wastage;
-            document.getElementById('edit-recipe-daily-volume').value = recipe.dailyVolume;
+        // Edit recipe modal
+        function openEditRecipeModal(id){
+            const r = DATA.recipes[id];
+            if (!r) return;
+            selectedEditRecipeId = id;
+            document.getElementById('edit-recipe-selling-price').value = r.sellingPrice || '';
+            document.getElementById('edit-recipe-wastage').value = r.wastage || '';
+            document.getElementById('edit-recipe-daily-volume').value = r.dailyVolume || '';
             openModal('edit-recipe-modal');
         }
-
-        function updateRecipe() {
-            if (!editingRecipeId) return;
-            const data = loadData();
-            const recipe = data.recipes[editingRecipeId];
-            recipe.sellingPrice = parseFloat(document.getElementById('edit-recipe-selling-price').value);
-            recipe.wastage = parseFloat(document.getElementById('edit-recipe-wastage').value);
-            recipe.dailyVolume = parseInt(document.getElementById('edit-recipe-daily-volume').value);
-            saveAllData(data);
-            updateRecipesDisplay();
+        function updateRecipe(){
+            if (!selectedEditRecipeId) return;
+            const r = DATA.recipes[selectedEditRecipeId];
+            if (!r) return;
+            r.sellingPrice = parseFloat(document.getElementById('edit-recipe-selling-price').value) || 0;
+            r.wastage = parseFloat(document.getElementById('edit-recipe-wastage').value) || 0;
+            r.dailyVolume = parseFloat(document.getElementById('edit-recipe-daily-volume').value) || 1;
+            DATA.recipes[selectedEditRecipeId] = r;
+            saveAllData(DATA);
+            renderRecipesList();
             updateDashboard();
             closeModal('edit-recipe-modal');
-            showAlert('Updated', 'success');
+            alert('Recipe updated');
         }
-
-        function deleteRecipe() {
-            if (!editingRecipeId || !confirm('Delete?')) return;
-            const data = loadData();
-            delete data.recipes[editingRecipeId];
-            saveAllData(data);
-            updateRecipesDisplay();
+        function deleteRecipe(){
+            if (!selectedEditRecipeId) return;
+            if (!confirm('Delete this recipe?')) return;
+            delete DATA.recipes[selectedEditRecipeId];
+            saveAllData(DATA);
+            renderRecipesList();
             updateDashboard();
             closeModal('edit-recipe-modal');
         }
 
-        function updateRecipesDisplay() {
-            const data = loadData();
-            const list = document.getElementById('recipes-list');
-            list.innerHTML = '';
-
-            if (Object.keys(data.recipes).length === 0) {
-                list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🍽️</div><div class="empty-state-title">No recipes</div></div>';
-                return;
-            }
-
-            Object.values(data.recipes).forEach(recipe => {
-                const costs = calculateRecipeCost(recipe, data);
-                const profit = recipe.sellingPrice - costs.totalMakingCost;
-                const profitMargin = costs.totalMakingCost > 0 ? ((profit / costs.totalMakingCost) * 100) : 0;
-                const isBelow = profitMargin < data.profitMargin;
-                const categoryBadge = recipe.category === 'sweets' ? '🍬 Sweets' : '🍽️ Restaurant';
-                const deptClass = recipe.category === 'sweets' ? 'sweets' : 'restaurant';
-
-                const dish = document.createElement('div');
-                dish.className = 'dish-row' + (isBelow ? ' profit-alert' : '');
-                
-                let ingredientsList = '';
-                if (costs.ingredientBreakdown && costs.ingredientBreakdown.length > 0) {
-                    ingredientsList = '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border); font-size: 10px;">';
-                    costs.ingredientBreakdown.forEach(ing => {
-                        ingredientsList += `<div style="display: flex; justify-content: space-between;"><span>${ing.name}: ${ing.qty}${ing.unit}</span><span>₹${ing.cost.toFixed(2)}</span></div>`;
-                    });
-                    ingredientsList += '</div>';
-                }
-                
-                dish.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <div class="dish-name">${recipe.name}</div>
-                        <span class="dept-badge ${deptClass}">${categoryBadge}</span>
-                    </div>
-                    <div class="dish-details">
-                        <div class="detail-item"><span class="detail-label">Raw:</span><span class="detail-value">₹${costs.ingredientCost.toFixed(2)}</span></div>
-                        <div class="detail-item"><span class="detail-label">Waste:</span><span class="detail-value">₹${costs.wastageAmount.toFixed(2)}</span></div>
-                        <div class="detail-item"><span class="detail-label">Labour:</span><span class="detail-value">₹${costs.labourPerUnit.toFixed(2)}</span></div>
-                        <div class="detail-item"><span class="detail-label">Utilities:</span><span class="detail-value">₹${costs.utilitiesPerUnit.toFixed(2)}</span></div>
-                    </div>
-                    ${ingredientsList}
-                    <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px;">
-                        <div style="background: var(--color-surface-light); padding: 8px; border-radius: 6px;">
-                            <div style="color: var(--color-text-secondary); font-size: 10px;">Price</div>
-                            <div style="font-weight: 600;">₹${recipe.sellingPrice.toFixed(2)}</div>
-                        </div>
-                        <div style="background: var(--color-surface-light); padding: 8px; border-radius: 6px;">
-                            <div style="color: var(--color-text-secondary); font-size: 10px;">Profit</div>
-                            <div style="font-weight: 600; color: ${profit >= 0 ? 'var(--color-success)' : 'var(--color-error)'}">${profit >= 0 ? '+' : ''}₹${profit.toFixed(2)}</div>
-                        </div>
-                    </div>
-                    <div style="margin-top: 8px;">
-                        <div class="profit-margin ${profit >= 0 ? 'positive' : 'negative'}">
-                            ${profit >= 0 ? '✓' : '✗'} ${profitMargin.toFixed(1)}%
-                        </div>
-                    </div>
-                    ${isBelow ? `<div class="suggested-price">💡 Suggest: ₹${(costs.totalMakingCost * (1 + data.profitMargin / 100)).toFixed(2)}</div>` : ''}
-                    <div style="margin-top: 12px;">
-                        <button class="btn btn-secondary btn-small" onclick="openEditRecipe('${recipe.id}')">Edit</button>
-                    </div>
-                `;
-                list.appendChild(dish);
-            });
+        // ------------------ SHOP/FACTORY/PAYROLL ------------------
+        function saveShopOverhead(){
+            const el = document.getElementById('shop-electricity').value || 0;
+            const gas = document.getElementById('shop-gas').value || 0;
+            DATA.shop_overhead = { electricity: parseFloat(el)||0, gas: parseFloat(gas)||0 };
+            saveAllData(DATA);
+            alert('Shop overhead saved');
+            updateDashboard();
+        }
+        function saveFactoryOverhead(){
+            const el = document.getElementById('factory-electricity').value || 0;
+            const gas = document.getElementById('factory-gas').value || 0;
+            DATA.factory_overhead = { electricity: parseFloat(el)||0, gas: parseFloat(gas)||0 };
+            saveAllData(DATA);
+            alert('Factory overhead saved');
+            updateDashboard();
+        }
+        function saveProfitMargin(){
+            const val = parseFloat(document.getElementById('profit-margin-target').value);
+            DATA.profitMargin = isNaN(val) ? DEFAULT_PROFIT_MARGIN : val;
+            saveAllData(DATA);
+            alert('Profit margin target saved');
+            updateDashboard();
         }
 
-        // ==================== DASHBOARD ====================
-        function updateDashboard() {
-            const data = loadData();
-            const recipes = Object.values(data.recipes);
-            const staff = Object.values(data.staff);
-
-            document.getElementById('stat-recipes').textContent = recipes.length;
-            document.getElementById('stat-total-staff').textContent = staff.length;
-
-            let totalProfit = 0, redDishes = 0;
-            recipes.forEach(recipe => {
-                const costs = calculateRecipeCost(recipe, data);
-                const profit = recipe.sellingPrice - costs.totalMakingCost;
-                const profitMargin = costs.totalMakingCost > 0 ? ((profit / costs.totalMakingCost) * 100) : 0;
-                totalProfit += profitMargin;
-                if (profitMargin < data.profitMargin) redDishes++;
-            });
-
-            const avgProfit = recipes.length > 0 ? (totalProfit / recipes.length) : 0;
-            document.getElementById('stat-avg-profit').textContent = avgProfit.toFixed(1) + '%';
-            document.getElementById('stat-red-dishes').textContent = redDishes;
-
-            const dashboardList = document.getElementById('dashboard-dishes-list');
-            dashboardList.innerHTML = '';
-
-            if (recipes.length === 0) {
-                dashboardList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">No dishes</div></div>';
-                return;
-            }
-
-            recipes.forEach(recipe => {
-                const costs = calculateRecipeCost(recipe, data);
-                const profit = recipe.sellingPrice - costs.totalMakingCost;
-                const profitMargin = costs.totalMakingCost > 0 ? ((profit / costs.totalMakingCost) * 100) : 0;
-                const isBelow = profitMargin < data.profitMargin;
-                const categoryBadge = recipe.category === 'sweets' ? '🍬' : '🍽️';
-                const deptClass = recipe.category === 'sweets' ? 'sweets' : 'restaurant';
-
-                const dish = document.createElement('div');
-                dish.className = 'dish-row' + (isBelow ? ' profit-alert' : '');
-                dish.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                        <div class="dish-name">${recipe.name}</div>
-                        <span class="dept-badge ${deptClass}">${categoryBadge}</span>
-                    </div>
-                    <div class="dish-details">
-                        <div class="detail-item"><span class="detail-label">Cost:</span><span class="detail-value">₹${costs.totalMakingCost.toFixed(2)}</span></div>
-                        <div class="detail-item"><span class="detail-label">Price:</span><span class="detail-value">₹${recipe.sellingPrice.toFixed(2)}</span></div>
-                    </div>
-                    <div class="profit-margin ${profit >= 0 ? 'positive' : 'negative'}" style="margin-top: 8px;">
-                        ${profit >= 0 ? '✓' : '✗'}: ₹${profit.toFixed(2)} (${profitMargin.toFixed(1)}%)
-                    </div>
-                    ${isBelow ? `<div class="suggested-price">💡 ₹${(costs.totalMakingCost * (1 + data.profitMargin / 100)).toFixed(2)}</div>` : ''}
-                `;
-                dashboardList.appendChild(dish);
-            });
+        // ------------------ STAFF ------------------
+        function addStaffMember(){
+            const name = document.getElementById('staff-name').value.trim();
+            const phone = document.getElementById('staff-phone').value.trim();
+            const dept = document.getElementById('staff-department').value;
+            const designation = document.getElementById('staff-designation').value.trim();
+            const salary = parseFloat(document.getElementById('staff-salary').value) || 0;
+            if (!name){ alert('Enter staff name'); return; }
+            const id = uid();
+            DATA.staff[id] = { id, name, phone, department: dept, designation, salary };
+            saveAllData(DATA);
+            renderStaffTable();
+            document.getElementById('staff-name').value=''; document.getElementById('staff-phone').value=''; document.getElementById('staff-salary').value='';
+            closeModal('staff-modal');
         }
-
-        // ==================== BULK FUNCTIONS ====================
-        function bulkUploadMenu() {
-            const csvData = document.getElementById('bulk-upload-data').value.trim();
-            if (!csvData) {
-                showAlert('Enter menu data', 'error');
-                return;
-            }
-
-            const data = loadData();
-            const lines = csvData.split('\n');
-            let updated = 0;
-
+        function removeStaff(id){
+            if (!confirm('Remove staff?')) return;
+            delete DATA.staff[id];
+            saveAllData(DATA);
+            renderStaffTable();
+            updateDashboard();
+        }
+        function bulkUploadStaff(){
+            const text = document.getElementById('bulk-staff-data').value.trim();
+            if (!text) { alert('Paste bulk staff lines'); return; }
+            const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
             lines.forEach(line => {
-                const parts = line.split(',').map(p => p.trim());
-                if (parts.length >= 3) {
-                    const dishName = parts[0];
-                    const category = parts[1].toLowerCase();
-                    const sellingPrice = parseFloat(parts[2]);
-
-                    if ((category === 'restaurant' || category === 'sweets') && !isNaN(sellingPrice)) {
-                        let found = Object.values(data.recipes).find(r => r.name.toLowerCase() === dishName.toLowerCase());
-                        if (found) {
-                            found.sellingPrice = sellingPrice;
-                        } else {
-                            const id = 'rec_' + Date.now() + '_' + updated;
-                            data.recipes[id] = { id, name: dishName, category, sellingPrice, wastage: 10, dailyVolume: 50, ingredients: {} };
-                        }
-                        updated++;
-                    }
-                }
+                const parts = line.split(',').map(p=>p.trim());
+                if (parts.length < 5) return;
+                const [name, department, designation, phone, salary] = parts;
+                const id = uid();
+                DATA.staff[id] = { id, name, phone, department, designation, salary: parseFloat(salary)||0 };
             });
+            saveAllData(DATA);
+            renderStaffTable();
+            closeModal('bulk-staff-modal');
+        }
 
-            saveAllData(data);
-            document.getElementById('bulk-upload-data').value = '';
-            updateRecipesDisplay();
+        // ------------------ BULK MENU, EXPORT/IMPORT, CLEAR ------------------
+        function bulkUploadMenu(){
+            const text = document.getElementById('bulk-upload-data').value.trim();
+            if (!text) { alert('Enter menu lines'); return; }
+            const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+            lines.forEach(line=>{
+                const parts = line.split(',').map(p=>p.trim());
+                if (parts.length < 3) return;
+                const [name, category, selling] = parts;
+                const id = uid();
+                DATA.recipes[id] = { id, name, category, sellingPrice: parseFloat(selling)||0, wastage:10, dailyVolume:50, ingredients:[] };
+            });
+            saveAllData(DATA);
+            renderRecipesList();
             updateDashboard();
-            showAlert(`Updated ${updated}`, 'success');
+            alert('Bulk menu uploaded');
         }
 
-        // ==================== DATA EXPORT/IMPORT ====================
-        function exportData() {
-            const data = {
-                ingredients: JSON.parse(localStorage.getItem(STORAGE_KEYS.ingredients) || '{}'),
-                recipes: JSON.parse(localStorage.getItem(STORAGE_KEYS.recipes) || '{}'),
-                shop_overhead: JSON.parse(localStorage.getItem(STORAGE_KEYS.shop_overhead) || '{}'),
-                factory_overhead: JSON.parse(localStorage.getItem(STORAGE_KEYS.factory_overhead) || '{}'),
-                staff: JSON.parse(localStorage.getItem(STORAGE_KEYS.staff) || '{}'),
-                profitMargin: parseFloat(localStorage.getItem(STORAGE_KEYS.profitMargin) || DEFAULT_PROFIT_MARGIN),
-                exportDate: new Date().toISOString()
-            };
-
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
+        function exportData(){
+            const exportObj = { data: DATA, exported_at: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `restaurant_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'gokulsweets_backup_' + Date.now() + '.json';
+            document.body.appendChild(a); a.click(); a.remove();
             URL.revokeObjectURL(url);
-            showAlert('Exported', 'success');
         }
 
-        function triggerImport() {
+        function triggerImport(){
             document.getElementById('import-file').click();
         }
 
-        function importData() {
-            const file = document.getElementById('import-file').files[0];
-            if (!file) return;
-
+        function importData(event){
+            const file = (event && event.target && event.target.files && event.target.files[0]) || null;
+            if (!file) { alert('No file selected'); return; }
             const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    saveAllData(data);
-                    updateIngredientsList();
-                    updateRecipesDisplay();
-                    updateDashboard();
-                    loadOverheadFields();
-                    loadProfitMarginField();
-                    showAlert('Imported', 'success');
-                    document.getElementById('import-file').value = '';
-                } catch (err) {
-                    showAlert('Invalid file', 'error');
-                }
+            reader.onload = function(e){
+                try{
+                    const parsed = JSON.parse(e.target.result);
+                    if (parsed && parsed.data){
+                        DATA = parsed.data;
+                        saveAllData(DATA);
+                        renderIngredientsTable();
+                        renderRecipesList();
+                        renderStaffTable();
+                        updateDashboard();
+                        alert('Data imported');
+                    } else {
+                        alert('Invalid import file');
+                    }
+                }catch(err){ alert('Corrupt JSON'); }
             };
             reader.readAsText(file);
         }
 
-        function clearAllData() {
-            if (confirm('⚠️ DELETE ALL?')) {
-                localStorage.clear();
-                location.reload();
-            }
-        }
-
-        // ==================== UI FUNCTIONS ====================
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-            document.getElementById(tabName + '-tab').classList.add('active');
-            event.target.closest('.nav-item').classList.add('active');
-
-            const titles = { dashboard: 'Dashboard', ingredients: 'Ingredients', recipes: 'Recipes', settings: 'Settings' };
-            document.getElementById('page-title').textContent = titles[tabName];
-
-            if (tabName === 'ingredients') updateIngredientsList();
-            else if (tabName === 'recipes') updateRecipesDisplay();
-            else if (tabName === 'dashboard') updateDashboard();
-            else if (tabName === 'settings') { loadOverheadFields(); loadProfitMarginField(); }
-        }
-
-        function openModal(id) {
-            document.getElementById(id).classList.add('active');
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.remove('active');
-        }
-
-        function showAlert(message, type = 'success') {
-            const alert = document.createElement('div');
-            alert.className = 'alert ' + type;
-            alert.textContent = message;
-            document.body.appendChild(alert);
-            setTimeout(() => alert.remove(), 3000);
-        }
-
-        // ==================== INITIALIZATION ====================
-        document.addEventListener('DOMContentLoaded', () => {
+        function clearAllData(){
+            if (!confirm('Clear all saved data? This cannot be undone.')) return;
+            Object.values(STORAGE_KEYS).forEach(k => localStorage.removeItem(k));
+            DATA = loadData();
+            currentRecipeIngredients = [];
+            renderIngredientsTable();
+            renderRecipesList();
+            renderStaffTable();
             updateDashboard();
-            updateIngredientsList();
-            updateRecipesDisplay();
-            loadOverheadFields();
-            loadProfitMarginField();
-            updateStaffDisplay();
+            alert('All data cleared');
+        }
 
-            const wastageInput = document.getElementById('recipe-wastage');
-            const volumeInput = document.getElementById('recipe-daily-volume');
-            const categoryInput = document.getElementById('recipe-category');
-            if (wastageInput) wastageInput.addEventListener('change', updateRecipeCostPreview);
-            if (wastageInput) wastageInput.addEventListener('input', updateRecipeCostPreview);
-            if (volumeInput) volumeInput.addEventListener('change', updateRecipeCostPreview);
-            if (volumeInput) volumeInput.addEventListener('input', updateRecipeCostPreview);
-            if (categoryInput) categoryInput.addEventListener('change', updateRecipeCostPreview);
-        });
+        // ------------------ MODALS & UI ------------------
+        function openModal(id){
+            const el = document.getElementById(id);
+            if (el) el.classList.add('active');
+        }
+        function closeModal(id){
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('active');
+        }
+        function openEditRecipeModalById(id){ openEditRecipeModal(id); }
 
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) modal.classList.remove('active');
+        // Switch tab
+        function switchTab(tab){
+            // remove active on nav
+            document.querySelectorAll('.bottom-nav .nav-item').forEach(btn => btn.classList.remove('active'));
+            // set clicked
+            const navs = { dashboard:0, ingredients:1, recipes:2, settings:3 };
+            const idx = navs[tab] || 0;
+            const btn = document.querySelectorAll('.bottom-nav .nav-item')[idx];
+            if (btn) btn.classList.add('active');
+
+            // show tab contents
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tab + '-tab').classList.add('active');
+        }
+
+        // small escape html helper for safety from user input
+        function escapeHtml(s){
+            if (s === undefined || s === null) return '';
+            return String(s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; });
+        }
+
+        // remove staff helper referenced earlier
+        function removeStaff(id){ if(confirm('Remove staff?')){ delete DATA.staff[id]; saveAllData(DATA); renderStaffTable(); updateDashboard(); } }
+
+        // ------------------ INIT ------------------
+        function initApp(){
+            // populate UI inputs from DATA
+            document.getElementById('profit-margin-target').value = DATA.profitMargin || DEFAULT_PROFIT_MARGIN;
+            const so = DATA.shop_overhead || { electricity:0, gas:0 };
+            document.getElementById('shop-electricity').value = so.electricity || 0;
+            document.getElementById('shop-gas').value = so.gas || 0;
+            const fo = DATA.factory_overhead || { electricity:0, gas:0 };
+            document.getElementById('factory-electricity').value = fo.electricity || 0;
+            document.getElementById('factory-gas').value = fo.gas || 0;
+
+            renderIngredientsTable();
+            renderRecipesList();
+            renderStaffTable();
+            updateDashboard();
+
+            // update recipe preview on wastage / volume change
+            ['recipe-wastage','recipe-daily-volume'].forEach(id=>{
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', updateRecipePreviewCosts);
             });
-        });
+        }
+
+        // run init once DOM ready
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
