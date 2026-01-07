@@ -81,36 +81,62 @@
       const userIdToUse = userId || this.currentUserId;
       
       if (!userIdToUse) {
-        console.warn('No user ID available, saving without user_id (legacy mode)');
+        console.warn('No user ID available, cannot save to cloud');
+        return { success: false, error: 'Not authenticated' };
       }
 
       try {
-        const dataToSave = {
-          device_id: deviceId,
-          payload: payload,
-          updated_at: new Date().toISOString()
-        };
+        console.log('Saving data to Supabase...');
 
-        // Add user_id if available (for authenticated mode)
-        if (userIdToUse) {
-          dataToSave.user_id = userIdToUse;
-        }
-
-        const { data, error } = await this.client
+        // First, check if a record exists
+        const { data: existing, error: selectError } = await this.client
           .from('gokul_app_data')
-          .upsert(dataToSave, {
-            onConflict: userIdToUse ? 'user_id,device_id' : 'device_id'
-          });
+          .select('id')
+          .eq('user_id', userIdToUse)
+          .eq('device_id', deviceId)
+          .maybeSingle();
 
-        if (error) {
-          console.error('Error saving data to Supabase:', error);
-          throw error;
+        if (selectError) {
+          console.error('Error checking existing data:', selectError);
+          throw selectError;
         }
 
-        console.log('Data saved to Supabase successfully');
-        return { success: true, data };
+        let result;
+        
+        if (existing) {
+          // Update existing record
+          console.log('Updating existing record...');
+          result = await this.client
+            .from('gokul_app_data')
+            .update({ 
+              payload: payload, 
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', existing.id)
+            .select();
+        } else {
+          // Insert new record
+          console.log('Inserting new record...');
+          result = await this.client
+            .from('gokul_app_data')
+            .insert({
+              user_id: userIdToUse,
+              device_id: deviceId,
+              payload: payload,
+              updated_at: new Date().toISOString()
+            })
+            .select();
+        }
+
+        if (result.error) {
+          console.error('❌ Error saving data to Supabase:', result.error);
+          throw result.error;
+        }
+
+        console.log('✅ Data saved to Supabase successfully:', result.data);
+        return { success: true, data: result.data };
       } catch (error) {
-        console.error('Failed to save data:', error);
+        console.error('❌ Failed to save data:', error);
         throw error;
       }
     },
