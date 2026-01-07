@@ -858,7 +858,10 @@
             }
             
             // CRITICAL: Create a deep clone to prevent mutation during async save
-            const dataSnapshot = JSON.parse(JSON.stringify(data));
+            // Use structuredClone if available (modern browsers), fallback to JSON method
+            const dataSnapshot = (typeof structuredClone !== 'undefined') 
+                ? structuredClone(data) 
+                : JSON.parse(JSON.stringify(data));
             
             // Save to localStorage
             try {
@@ -1782,7 +1785,7 @@
                     
                     // SAFETY: Don't overwrite cloud data with empty recipes if we had recipes before
                     if (Object.keys(DATA.recipes || {}).length > 0) {
-                        console.error('❌ ABORT: Preventing data loss - local has recipes but save payload doesn\'t');
+                        console.error("❌ ABORT: Preventing data loss - local has recipes but save payload doesn't");
                         return { success: false, error: 'Data consistency check failed' };
                     }
                 }
@@ -1894,7 +1897,10 @@
             
             try {
                 // Create snapshot to maintain consistency with automatic save
-                const dataSnapshot = JSON.parse(JSON.stringify(DATA));
+                // Use structuredClone if available (modern browsers), fallback to JSON method
+                const dataSnapshot = (typeof structuredClone !== 'undefined') 
+                    ? structuredClone(DATA) 
+                    : JSON.parse(JSON.stringify(DATA));
                 const result = await window.saveUserData(dataSnapshot);
                 
                 if (result && result.success) {
