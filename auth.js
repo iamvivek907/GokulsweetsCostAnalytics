@@ -1,22 +1,24 @@
 // Authentication Module for Gokul Sweets Cost Analytics
-// Handles user authentication, session management, and UI
+// Enhanced with proper cleanup and state management
 
 (function() {
   'use strict';
 
-  // Global namespace for authentication
+  // Global timeout tracker to prevent memory leaks
+  let loginTimeoutId = null;
+  let signupTimeoutId = null;
+  let authStateUnsubscribe = null;
+
   window.Auth = {
     currentUser: null,
     supabaseClient: null,
     initialized: false,
 
-    // Initialize authentication system
     async init(supabaseUrl, supabaseKey) {
       if (!supabaseUrl || !supabaseKey) {
         throw new Error('Supabase URL and key are required');
       }
 
-      // Load Supabase library if not already loaded
       if (!window.supabase) {
         await this._loadSupabaseLibrary();
       }
@@ -24,19 +26,18 @@
       try {
         this.supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         this.initialized = true;
-        console.log('Auth system initialized');
+        console.log('✅ Auth system initialized');
 
-        // Check for existing session
         const { data: { session } } = await this.supabaseClient.auth.getSession();
         if (session) {
           this.currentUser = session.user;
-          console.log('Existing session found:', this.currentUser.email);
+          console.log('✅ Existing session found:', this.currentUser.email);
           return { user: this.currentUser, session };
         }
 
         return { user: null, session: null };
       } catch (error) {
-        console.error('Failed to initialize auth system:', error);
+        console.error('❌ Failed to initialize auth:', error);
         throw error;
       }
     },
@@ -62,53 +63,40 @@
       });
     },
 
-    // Sign up new user
     async signUp(email, password) {
       if (!this.initialized) {
         throw new Error('Auth system not initialized');
       }
 
-      try {
-        const { data, error } = await this.supabaseClient.auth.signUp({
-          email,
-          password,
-        });
+      const { data, error } = await this.supabaseClient.auth.signUp({
+        email,
+        password,
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        this.currentUser = data.user;
-        console.log('User signed up:', email);
-        return { user: data.user, session: data.session };
-      } catch (error) {
-        console.error('Sign up error:', error);
-        throw error;
-      }
+      this.currentUser = data.user;
+      console.log('✅ User signed up:', email);
+      return { user: data.user, session: data.session };
     },
 
-    // Sign in existing user
     async signIn(email, password) {
       if (!this.initialized) {
         throw new Error('Auth system not initialized');
       }
 
-      try {
-        const { data, error } = await this.supabaseClient.auth.signInWithPassword({
-          email,
-          password,
-        });
+      const { data, error } = await this.supabaseClient.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        this.currentUser = data.user;
-        console.log('User signed in:', email);
-        return { user: data.user, session: data.session };
-      } catch (error) {
-        console.error('Sign in error:', error);
-        throw error;
-      }
+      this.currentUser = data.user;
+      console.log('✅ User signed in:', email);
+      return { user: data.user, session: data.session };
     },
 
-    // Sign out current user
     async signOut() {
       if (!this.initialized) {
         throw new Error('Auth system not initialized');
@@ -118,8 +106,15 @@
         const { error } = await this.supabaseClient.auth.signOut();
         if (error) throw error;
 
-        console.log('User signed out');
+        console.log('✅ User signed out');
         this.currentUser = null;
+        
+        // Clean up auth state listener
+        if (authStateUnsubscribe) {
+          authStateUnsubscribe();
+          authStateUnsubscribe = null;
+        }
+        
         return true;
       } catch (error) {
         console.error('Sign out error:', error);
@@ -142,20 +137,25 @@
       }
     },
 
-    // Listen to auth state changes
     onAuthStateChange(callback) {
       if (!this.initialized) {
         console.warn('Auth system not initialized');
         return () => {};
       }
 
+      // Clean up previous subscription if exists
+      if (authStateUnsubscribe) {
+        authStateUnsubscribe();
+      }
+
       const { data: { subscription } } = this.supabaseClient.auth.onAuthStateChange((event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         this.currentUser = session?.user || null;
         callback(event, session);
       });
 
-      return () => subscription.unsubscribe();
+      authStateUnsubscribe = () => subscription.unsubscribe();
+      return authStateUnsubscribe;
     },
 
     // Check if user is authenticated
@@ -163,21 +163,28 @@
       return this.currentUser !== null;
     },
 
-    // Get current user
     getCurrentUser() {
       return this.currentUser;
+    },
+
+    // Clean up all auth-related state
+    cleanup() {
+      if (authStateUnsubscribe) {
+        authStateUnsubscribe();
+        authStateUnsubscribe = null;
+      }
+      this.currentUser = null;
     }
   };
 
-  // UI Components for Authentication
   window.AuthUI = {
-    // Show authentication screen
     show() {
       const authScreen = document.getElementById('auth-screen');
       if (authScreen) {
         authScreen.style.display = 'flex';
       }
       this.hideError();
+      this.resetForms();
     },
 
     // Hide authentication screen
@@ -235,7 +242,6 @@
       }
     },
 
-    // Toggle between login and signup modes
     toggleMode() {
       const loginForm = document.getElementById('login-form');
       const signupForm = document.getElementById('signup-form');
@@ -254,7 +260,9 @@
           if (modeToggle) modeToggle.textContent = "Don't have an account? Sign up";
         }
       }
+      
       this.hideError();
+      this.resetForms();
     },
 
     // Update user info in header
@@ -271,7 +279,6 @@
       }
     },
 
-    // Clear user info from header
     clearUserInfo() {
       const userEmailEl = document.getElementById('user-email');
       if (userEmailEl) {
@@ -283,10 +290,49 @@
       if (logoutBtn) {
         logoutBtn.style.display = 'none';
       }
+    },
+
+    // Reset all form states to default
+    resetForms() {
+      // Reset login form
+      const loginBtn = document.getElementById('login-submit');
+      if (loginBtn) {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Login';
+      }
+
+      const loginEmail = document.getElementById('login-email');
+      const loginPassword = document.getElementById('login-password');
+      if (loginEmail) loginEmail.value = '';
+      if (loginPassword) loginPassword.value = '';
+
+      // Reset signup form
+      const signupBtn = document.getElementById('signup-submit');
+      if (signupBtn) {
+        signupBtn.disabled = false;
+        signupBtn.textContent = 'Sign Up';
+      }
+
+      const signupEmail = document.getElementById('signup-email');
+      const signupPassword = document.getElementById('signup-password');
+      const signupConfirm = document.getElementById('signup-confirm-password');
+      if (signupEmail) signupEmail.value = '';
+      if (signupPassword) signupPassword.value = '';
+      if (signupConfirm) signupConfirm.value = '';
+
+      // Clear any pending timeouts
+      if (loginTimeoutId) {
+        clearTimeout(loginTimeoutId);
+        loginTimeoutId = null;
+      }
+      if (signupTimeoutId) {
+        clearTimeout(signupTimeoutId);
+        signupTimeoutId = null;
+      }
     }
   };
 
-  // Login handler with 15-second timeout
+  // Login handler with comprehensive cleanup
   window.handleLogin = async function() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
@@ -299,41 +345,85 @@
 
     // Prevent multiple submissions
     if (submitBtn.disabled) {
+      console.warn('⚠️ Login already in progress');
       return;
+    }
+
+    // Clear any existing timeout
+    if (loginTimeoutId) {
+      clearTimeout(loginTimeoutId);
+      loginTimeoutId = null;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Signing in...';
     window.AuthUI.hideError();
 
-    // 15-second timeout
-    const timeoutId = setTimeout(() => {
+    // Set 15-second timeout
+    loginTimeoutId = setTimeout(() => {
+      console.error('❌ Login timeout after 15 seconds');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Login';
       window.AuthUI.showError('Login timeout. Please check your connection and try again.');
+      loginTimeoutId = null;
     }, 15000);
 
     try {
+      console.log('🔐 Attempting login for:', email);
       const result = await window.Auth.signIn(email, password);
-      clearTimeout(timeoutId);
+      
+      // Clear timeout on success
+      if (loginTimeoutId) {
+        clearTimeout(loginTimeoutId);
+        loginTimeoutId = null;
+      }
       
       if (result.user) {
+        console.log('✅ Login successful');
+        
+        // Hide auth screen and show app
         window.AuthUI.hide();
         window.AuthUI.showApp();
         window.AuthUI.updateUserInfo(result.user.email);
         
-        // Initialize real-time sync
+        // CRITICAL: Stop any existing real-time sync
         if (window.SupabaseSync && window.SupabaseSync.isReady()) {
-          window.SupabaseSync.initRealtimeSync();
+          console.log('🛑 Stopping existing real-time sync...');
+          window.SupabaseSync.stopRealtimeSync();
         }
         
-        // Load user data
+        // CRITICAL: Force data reload from cloud
+        console.log('📥 Force loading user data from cloud...');
         if (typeof window.loadUserData === 'function') {
-          await window.loadUserData(result.user.id);
+          try {
+            await window.loadUserData(result.user.id);
+            console.log('✅ User data loaded successfully');
+          } catch (error) {
+            console.error('❌ Failed to load user data:', error);
+            window.AuthUI.showError('Failed to load data. Please refresh the page.');
+          }
         }
+        
+        // CRITICAL: Re-initialize real-time sync
+        if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+          console.log('🔄 Re-initializing real-time sync...');
+          setTimeout(() => {
+            window.SupabaseSync.initRealtimeSync();
+          }, 500); // Small delay to ensure data is loaded first
+        }
+        
+        // Reset form for next time
+        document.getElementById('login-email').value = '';
+        document.getElementById('login-password').value = '';
       }
     } catch (error) {
-      clearTimeout(timeoutId);
+      // Clear timeout on error
+      if (loginTimeoutId) {
+        clearTimeout(loginTimeoutId);
+        loginTimeoutId = null;
+      }
+      
+      console.error('❌ Login error:', error);
       
       let errorMessage = 'Login failed. Please try again.';
       if (error.message) {
@@ -341,8 +431,10 @@
           errorMessage = 'Invalid email or password';
         } else if (error.message.includes('Email not confirmed')) {
           errorMessage = 'Please confirm your email address';
-        } else if (error.message.includes('fetch')) {
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
           errorMessage = 'Network error. Please check your connection.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
         } else {
           errorMessage = error.message;
         }
@@ -354,7 +446,7 @@
     }
   };
 
-  // Signup handler with timeout
+  // Signup handler with comprehensive cleanup
   window.handleSignup = async function() {
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
@@ -376,53 +468,87 @@
       return;
     }
 
+    // Prevent multiple submissions
     if (submitBtn.disabled) {
+      console.warn('⚠️ Signup already in progress');
       return;
+    }
+
+    // Clear any existing timeout
+    if (signupTimeoutId) {
+      clearTimeout(signupTimeoutId);
+      signupTimeoutId = null;
     }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating account...';
     window.AuthUI.hideError();
 
-    const timeoutId = setTimeout(() => {
+    // Set 15-second timeout
+    signupTimeoutId = setTimeout(() => {
+      console.error('❌ Signup timeout after 15 seconds');
       submitBtn.disabled = false;
       submitBtn.textContent = 'Sign Up';
       window.AuthUI.showError('Signup timeout. Please try again.');
+      signupTimeoutId = null;
     }, 15000);
 
     try {
+      console.log('📝 Attempting signup for:', email);
       const result = await window.Auth.signUp(email, password);
-      clearTimeout(timeoutId);
+      
+      // Clear timeout on success
+      if (signupTimeoutId) {
+        clearTimeout(signupTimeoutId);
+        signupTimeoutId = null;
+      }
       
       if (result.user) {
         if (result.session) {
+          console.log('✅ Signup successful with immediate session');
+          
           window.AuthUI.hide();
           window.AuthUI.showApp();
           window.AuthUI.updateUserInfo(result.user.email);
+          
+          // Initialize for new user
+          if (typeof window.initializeUserData === 'function') {
+            await window.initializeUserData(result.user.id);
+          }
           
           // Initialize real-time sync
           if (window.SupabaseSync && window.SupabaseSync.isReady()) {
             window.SupabaseSync.initRealtimeSync();
           }
           
-          if (typeof window.initializeUserData === 'function') {
-            await window.initializeUserData(result.user.id);
-          }
+          // Reset form
+          document.getElementById('signup-email').value = '';
+          document.getElementById('signup-password').value = '';
+          document.getElementById('signup-confirm-password').value = '';
         } else {
-          window.AuthUI.showError('Account created! Please check email to confirm.');
+          console.log('✅ Signup successful - email confirmation required');
+          window.AuthUI.showError('Account created! Please check your email to confirm.');
           submitBtn.disabled = false;
           submitBtn.textContent = 'Sign Up';
         }
       }
     } catch (error) {
-      clearTimeout(timeoutId);
+      // Clear timeout on error
+      if (signupTimeoutId) {
+        clearTimeout(signupTimeoutId);
+        signupTimeoutId = null;
+      }
+      
+      console.error('❌ Signup error:', error);
       
       let errorMessage = 'Signup failed. Please try again.';
       if (error.message) {
-        if (error.message.includes('already registered')) {
+        if (error.message.includes('already registered') || error.message.includes('already been registered')) {
           errorMessage = 'Email already registered. Please login.';
-        } else if (error.message.includes('fetch')) {
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
           errorMessage = 'Network error. Please check your connection.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timed out. Please try again.';
         } else {
           errorMessage = error.message;
         }
@@ -434,30 +560,58 @@
     }
   };
 
+  // Logout handler with comprehensive cleanup
   window.handleLogout = async function() {
     if (!confirm('Are you sure you want to logout?')) {
       return;
     }
 
     try {
-      // Stop real-time sync
+      console.log('🚪 Logging out...');
+      
+      // Stop real-time sync BEFORE signing out
       if (window.SupabaseSync) {
+        console.log('🛑 Stopping real-time sync...');
         window.SupabaseSync.stopRealtimeSync();
       }
       
+      // Sign out from Supabase
       await window.Auth.signOut();
+      
+      // Clean up auth state
+      window.Auth.cleanup();
+      
+      // Clear UI
       window.AuthUI.clearUserInfo();
       window.AuthUI.hideApp();
+      
+      // Reset auth forms BEFORE showing
+      window.AuthUI.resetForms();
+      
+      // Show auth screen
       window.AuthUI.show();
       
+      // Clear local data
       if (typeof window.clearLocalData === 'function') {
         window.clearLocalData();
       }
+      
+      // Clear any pending timeouts
+      if (loginTimeoutId) {
+        clearTimeout(loginTimeoutId);
+        loginTimeoutId = null;
+      }
+      if (signupTimeoutId) {
+        clearTimeout(signupTimeoutId);
+        signupTimeoutId = null;
+      }
+      
+      console.log('✅ Logout complete - all state cleaned up');
     } catch (error) {
-      console.error('Logout error:', error);
-      alert('Logout failed. Please try again.');
+      console.error('❌ Logout error:', error);
+      alert('Logout failed: ' + (error.message || 'Unknown error'));
     }
   };
 
-  console.log('Auth module loaded');
+  console.log('✅ Auth module loaded with enhanced cleanup');
 })();
