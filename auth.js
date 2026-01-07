@@ -316,9 +316,9 @@
       }
     } catch (error) {
       let errorMessage = 'Login failed. Please try again.';
-      if (error.message.includes('Invalid login credentials')) {
+      if (error.message && error.message.includes('Invalid login credentials')) {
         errorMessage = 'Invalid email or password';
-      } else if (error.message.includes('Email not confirmed')) {
+      } else if (error.message && error.message.includes('Email not confirmed')) {
         errorMessage = 'Please confirm your email address first';
       } else if (error.message) {
         errorMessage = error.message;
@@ -375,7 +375,7 @@
       }
     } catch (error) {
       let errorMessage = 'Signup failed. Please try again.';
-      if (error.message.includes('already registered')) {
+      if (error.message && error.message.includes('already registered')) {
         errorMessage = 'Email already registered. Please login.';
       } else if (error.message) {
         errorMessage = error.message;
