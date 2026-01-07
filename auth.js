@@ -9,6 +9,9 @@
   let signupTimeoutId = null;
   let authStateUnsubscribe = null;
 
+  // Configuration constants
+  const REALTIME_SYNC_DELAY_MS = 500; // Delay before re-initializing real-time sync after login
+
   window.Auth = {
     currentUser: null,
     supabaseClient: null,
@@ -409,7 +412,7 @@
           console.log('🔄 Re-initializing real-time sync...');
           setTimeout(() => {
             window.SupabaseSync.initRealtimeSync();
-          }, 500); // Small delay to ensure data is loaded first
+          }, REALTIME_SYNC_DELAY_MS); // Small delay to ensure data is loaded first
         }
         
         // Reset form for next time

@@ -1577,11 +1577,14 @@
             }
         }
 
-        // Clear local data on logout
+        // Called on logout to handle local data cleanup
+        // Note: This intentionally preserves localStorage to avoid data loss
+        // when users switch accounts or re-login. The real cleanup happens
+        // on the next login when cloud data is loaded.
         function clearLocalData() {
-            console.log('🗑️ Clearing local data...');
-            // Don't actually clear localStorage - just reset in-memory state
-            // This allows data to persist if user logs back in
+            console.log('🗑️ Handling logout data cleanup...');
+            // Don't actually clear localStorage - preserve it for next login
+            // This prevents data loss if user immediately logs back in
             console.log('ℹ️ Local storage preserved for next login');
         }
 
