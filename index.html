@@ -772,13 +772,91 @@
             return { ingredients, recipes, shop_overhead, factory_overhead, staff, profitMargin };
         }
 
+        // Validate data structure before saving/loading
+        function validateData(data) {
+            const validation = {
+                valid: true,
+                issues: []
+            };
+            
+            try {
+                // Check ingredients
+                if (data.ingredients && typeof data.ingredients === 'object') {
+                    Object.keys(data.ingredients).forEach(id => {
+                        const ing = data.ingredients[id];
+                        if (!ing.name || !ing.unit || typeof ing.price !== 'number') {
+                            validation.valid = false;
+                            validation.issues.push(`Invalid ingredient: ${id}`);
+                        }
+                    });
+                }
+                
+                // Check recipes
+                if (data.recipes && typeof data.recipes === 'object') {
+                    Object.keys(data.recipes).forEach(id => {
+                        const recipe = data.recipes[id];
+                        if (!recipe.name) {
+                            validation.valid = false;
+                            validation.issues.push(`Recipe ${id} missing name`);
+                        }
+                        if (!recipe.ingredients || !Array.isArray(recipe.ingredients)) {
+                            validation.valid = false;
+                            validation.issues.push(`Recipe ${id} has invalid ingredients array`);
+                        }
+                        if (typeof recipe.sellingPrice !== 'number') {
+                            validation.valid = false;
+                            validation.issues.push(`Recipe ${id} has invalid selling price`);
+                        }
+                    });
+                }
+                
+                // Check staff
+                if (data.staff && typeof data.staff === 'object') {
+                    Object.keys(data.staff).forEach(id => {
+                        const staff = data.staff[id];
+                        if (!staff.name || !staff.department || typeof staff.salary !== 'number') {
+                            validation.valid = false;
+                            validation.issues.push(`Invalid staff: ${id}`);
+                        }
+                    });
+                }
+                
+                console.log('Data validation:', validation.valid ? '✅ PASSED' : '❌ FAILED');
+                if (!validation.valid) {
+                    console.warn('Validation issues:', validation.issues);
+                }
+                
+                return validation;
+            } catch (error) {
+                console.error('Error during validation:', error);
+                return { valid: false, issues: ['Validation error: ' + error.message] };
+            }
+        }
+
         function saveAllData(data){
-            localStorage.setItem(STORAGE_KEYS.ingredients, JSON.stringify(data.ingredients));
-            localStorage.setItem(STORAGE_KEYS.recipes, JSON.stringify(data.recipes));
-            localStorage.setItem(STORAGE_KEYS.shop_overhead, JSON.stringify(data.shop_overhead));
-            localStorage.setItem(STORAGE_KEYS.factory_overhead, JSON.stringify(data.factory_overhead));
-            localStorage.setItem(STORAGE_KEYS.staff, JSON.stringify(data.staff));
-            localStorage.setItem(STORAGE_KEYS.profitMargin, (data.profitMargin||DEFAULT_PROFIT_MARGIN).toString());
+            // Validate data before saving
+            const validation = validateData(data);
+            if (!validation.valid) {
+                console.warn('⚠️ Saving potentially invalid data');
+            }
+            
+            // Save to localStorage
+            try {
+                localStorage.setItem(STORAGE_KEYS.ingredients, JSON.stringify(data.ingredients));
+                localStorage.setItem(STORAGE_KEYS.recipes, JSON.stringify(data.recipes));
+                localStorage.setItem(STORAGE_KEYS.shop_overhead, JSON.stringify(data.shop_overhead));
+                localStorage.setItem(STORAGE_KEYS.factory_overhead, JSON.stringify(data.factory_overhead));
+                localStorage.setItem(STORAGE_KEYS.staff, JSON.stringify(data.staff));
+                localStorage.setItem(STORAGE_KEYS.profitMargin, (data.profitMargin||DEFAULT_PROFIT_MARGIN).toString());
+                
+                console.log('💾 Data saved to localStorage:', {
+                    ingredients: Object.keys(data.ingredients || {}).length,
+                    recipes: Object.keys(data.recipes || {}).length,
+                    staff: Object.keys(data.staff || {}).length
+                });
+            } catch (error) {
+                console.error('❌ Error saving to localStorage:', error);
+            }
             
             // Auto-save to cloud if authenticated (debounced)
             if (window.Auth && window.Auth.isAuthenticated()) {
@@ -789,7 +867,7 @@
                             console.error('Auto-save to cloud failed:', err);
                         });
                     }
-                }, 1000); // Debounce for 1 second (reduced from 2s for faster sync)
+                }, 2000); // Debounce for 2 seconds
             }
         }
 
@@ -1478,6 +1556,44 @@
             }
         }
 
+        // Deep merge utility function to properly merge nested objects
+        function deepMerge(target, source) {
+            // Handle null/undefined
+            if (!source) return target || {};
+            if (!target) return source || {};
+            
+            // If source is not an object, return it directly
+            if (typeof source !== 'object' || Array.isArray(source)) {
+                return source;
+            }
+            
+            // Clone target to avoid mutations
+            const result = { ...target };
+            
+            // Merge each property from source
+            Object.keys(source).forEach(key => {
+                const sourceValue = source[key];
+                const targetValue = result[key];
+                
+                // If both are objects (but not arrays), merge recursively
+                if (
+                    sourceValue && 
+                    typeof sourceValue === 'object' && 
+                    !Array.isArray(sourceValue) &&
+                    targetValue &&
+                    typeof targetValue === 'object' &&
+                    !Array.isArray(targetValue)
+                ) {
+                    result[key] = deepMerge(targetValue, sourceValue);
+                } else {
+                    // Otherwise, use source value (overwrites target)
+                    result[key] = sourceValue;
+                }
+            });
+            
+            return result;
+        }
+
         // Force load user data from cloud (called after login)
         async function loadUserData(userId) {
             if (!userId) {
@@ -1496,75 +1612,131 @@
                     const cloudData = await window.SupabaseSync.loadData(deviceId, userId);
                     
                     if (cloudData && cloudData.payload) {
-                        console.log('✅ Cloud data found, syncing with local...');
+                        console.log('✅ Cloud data found, analyzing structure...');
+                        console.log('Cloud payload keys:', Object.keys(cloudData.payload));
                         
-                        // Get current local data
-                        const localData = loadData();
+                        // Count items in cloud data
+                        const cloudIngredients = cloudData.payload.ingredients || {};
+                        const cloudRecipes = cloudData.payload.recipes || {};
+                        const cloudStaff = cloudData.payload.staff || {};
                         
-                        // Prefer cloud data (it's the source of truth), but keep local as fallback
+                        console.log('Cloud data counts:', {
+                            ingredients: Object.keys(cloudIngredients).length,
+                            recipes: Object.keys(cloudRecipes).length,
+                            staff: Object.keys(cloudStaff).length
+                        });
+                        
+                        // DEEP MERGE: Properly merge nested objects
                         DATA = {
-                            ingredients: cloudData.payload.ingredients || localData.ingredients || {},
-                            recipes: cloudData.payload.recipes || localData.recipes || {},
-                            shop_overhead: cloudData.payload.shop_overhead || localData.shop_overhead || { electricity: 0, gas: 0 },
-                            factory_overhead: cloudData.payload.factory_overhead || localData.factory_overhead || { electricity: 0, gas: 0 },
-                            staff: cloudData.payload.staff || localData.staff || {},
-                            profitMargin: cloudData.payload.profitMargin || localData.profitMargin || DEFAULT_PROFIT_MARGIN
+                            ingredients: deepMerge(DATA.ingredients || {}, cloudIngredients),
+                            recipes: deepMerge(DATA.recipes || {}, cloudRecipes),
+                            shop_overhead: cloudData.payload.shop_overhead || DATA.shop_overhead || { electricity: 0, gas: 0 },
+                            factory_overhead: cloudData.payload.factory_overhead || DATA.factory_overhead || { electricity: 0, gas: 0 },
+                            staff: deepMerge(DATA.staff || {}, cloudStaff),
+                            profitMargin: cloudData.payload.profitMargin || DATA.profitMargin || DEFAULT_PROFIT_MARGIN
                         };
                         
-                        // Update localStorage with cloud data
-                        saveAllData(DATA);
-                        
-                        // Refresh all UI elements
-                        renderIngredientsTable();
-                        renderRecipesList();
-                        renderStaffTable();
-                        updateDashboard();
-                        
-                        console.log('✅ User data loaded and UI updated', {
+                        // Verify merge succeeded
+                        console.log('After merge counts:', {
                             ingredients: Object.keys(DATA.ingredients).length,
                             recipes: Object.keys(DATA.recipes).length,
                             staff: Object.keys(DATA.staff).length
                         });
+                        
+                        // Validate recipe data integrity
+                        if (Object.keys(DATA.recipes).length > 0) {
+                            console.log('✅ Recipes loaded successfully');
+                            Object.keys(DATA.recipes).forEach(recipeId => {
+                                const recipe = DATA.recipes[recipeId];
+                                console.log(`Recipe: ${recipe.name}, Ingredients: ${recipe.ingredients?.length || 0}`);
+                            });
+                        } else {
+                            console.warn('⚠️ No recipes found in merged data');
+                        }
+                        
+                        // Update localStorage with merged data
+                        saveAllData(DATA);
+                        
+                        // Refresh all UI elements with delay to ensure data is ready
+                        setTimeout(() => {
+                            updateDashboard();
+                            renderIngredientsTable();
+                            renderRecipesList();
+                            renderStaffTable();
+                            console.log('✅ User data loaded and UI updated');
+                        }, 100);
+                        
                     } else {
                         console.log('ℹ️ No cloud data found, using local data');
-                        // Still refresh UI with local data
+                        
+                        // Load from localStorage as fallback
+                        const localData = loadData();
+                        DATA = localData;
+                        
+                        // Update UI with local data
+                        updateDashboard();
                         renderIngredientsTable();
                         renderRecipesList();
                         renderStaffTable();
-                        updateDashboard();
                     }
                 } else {
                     console.warn('⚠️ Supabase not ready, using local data only');
-                    // Refresh UI with local data
+                    
+                    // Load from localStorage
+                    const localData = loadData();
+                    DATA = localData;
+                    
+                    // Update UI
+                    updateDashboard();
                     renderIngredientsTable();
                     renderRecipesList();
                     renderStaffTable();
-                    updateDashboard();
                 }
             } catch (error) {
                 console.error('❌ Error loading user data:', error);
-                // Don't throw - use local data as fallback and refresh UI
-                console.log('ℹ️ Falling back to local data');
-                renderIngredientsTable();
-                renderRecipesList();
-                renderStaffTable();
-                updateDashboard();
+                console.error('Error stack:', error.stack);
+                
+                // Don't throw - use local data as fallback
+                console.log('ℹ️ Falling back to local data due to error');
+                
+                try {
+                    const localData = loadData();
+                    DATA = localData;
+                    
+                    updateDashboard();
+                    renderIngredientsTable();
+                    renderRecipesList();
+                    renderStaffTable();
+                } catch (fallbackError) {
+                    console.error('❌ Even fallback failed:', fallbackError);
+                }
             }
         }
 
         // Save user data to Supabase (called automatically when data changes)
         async function saveUserData() {
             if (!window.Auth.isAuthenticated()) {
-                console.log('Not authenticated, skipping cloud save');
+                console.warn('⚠️ Not authenticated, skipping cloud save');
                 return;
             }
 
             try {
-                // Show sync indicator
-                showSyncIndicator('saving');
+                const user = window.Auth.getCurrentUser();
+                if (!user) {
+                    console.warn('⚠️ No user authenticated, skipping cloud save');
+                    return;
+                }
                 
                 const deviceId = getOrCreateDeviceId();
-                const userId = window.Auth.getCurrentUser()?.id;
+                
+                console.log('💾 Saving data to cloud:', {
+                    ingredients: Object.keys(DATA.ingredients || {}).length,
+                    recipes: Object.keys(DATA.recipes || {}).length,
+                    staff: Object.keys(DATA.staff || {}).length
+                });
+                
+                // Show sync indicator
+                showSyncIndicator('saving');
                 
                 const payload = {
                     ingredients: DATA.ingredients,
@@ -1576,14 +1748,20 @@
                     synced_at: new Date().toISOString()
                 };
                 
-                await window.SupabaseSync.saveData(deviceId, payload, userId);
-                console.log('✅ User data saved to cloud');
-                
-                // Show success indicator
-                showSyncIndicator('success');
+                if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+                    await window.SupabaseSync.saveData(deviceId, payload, user.id);
+                    console.log('✅ Data saved to cloud successfully');
+                    
+                    // Show success indicator
+                    showSyncIndicator('success');
+                } else {
+                    console.warn('⚠️ Supabase not ready, data saved locally only');
+                    showSyncIndicator('error');
+                }
             } catch (error) {
-                console.error('Failed to save user data:', error);
+                console.error('❌ Error saving to cloud:', error);
                 showSyncIndicator('error');
+                throw error;
             }
         }
 
