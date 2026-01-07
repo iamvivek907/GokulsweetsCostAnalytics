@@ -245,7 +245,7 @@
 
             <!-- Login Form -->
             <div id="login-form" style="display:block;">
-                <form class="auth-form" onsubmit="event.preventDefault(); handleLogin();">
+                <form class="auth-form" onsubmit="event.preventDefault(); window.handleLogin && window.handleLogin();">
                     <input 
                         type="email" 
                         id="login-email" 
@@ -265,13 +265,13 @@
                 </form>
                 <div class="auth-toggle">
                     <span>Don't have an account? </span>
-                    <a id="mode-toggle" onclick="window.AuthUI.toggleMode()">Sign up</a>
+                    <a id="mode-toggle" onclick="window.AuthUI && window.AuthUI.toggleMode()">Sign up</a>
                 </div>
             </div>
 
             <!-- Signup Form -->
             <div id="signup-form" style="display:none;">
-                <form class="auth-form" onsubmit="event.preventDefault(); handleSignup();">
+                <form class="auth-form" onsubmit="event.preventDefault(); window.handleSignup && window.handleSignup();">
                     <input 
                         type="email" 
                         id="signup-email" 
@@ -311,7 +311,7 @@
                 <h1 id="page-title">Dashboard</h1>
                 <div style="display:flex; align-items:center;">
                     <span id="user-email"></span>
-                    <button id="logout-btn" onclick="handleLogout()">Logout</button>
+                    <button id="logout-btn" onclick="window.handleLogout && window.handleLogout()">Logout</button>
                 </div>
             </div>
         </div>

@@ -26,17 +26,21 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Inject Supabase credentials
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           echo "Injecting Supabase configuration..."
           
-          # Replace placeholders in config.js with actual values from secrets
-          sed -i "s|url: '__SUPABASE_URL__'|url: '${{ secrets.SUPABASE_URL }}'|g" config.js
-          sed -i "s|anonKey: '__SUPABASE_ANON_KEY__'|anonKey: '${{ secrets.SUPABASE_ANON_KEY }}'|g" config.js
+          # Use environment variables and proper escaping for sed
+          # Using | as delimiter to avoid conflicts with / in URLs
+          sed -i "s|url: '__SUPABASE_URL__'|url: '${SUPABASE_URL}'|g" config.js
+          sed -i "s|anonKey: '__SUPABASE_ANON_KEY__'|anonKey: '${SUPABASE_ANON_KEY}'|g" config.js
           
           # Also inject into index.html if placeholders exist there
           if grep -q "__SUPABASE_URL__" index.html; then
-            sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" index.html
-            sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" index.html
+            sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
+            sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
           fi
           
           echo "Configuration injected successfully"
