@@ -1157,8 +1157,33 @@
                     return;
                 }
 
+                // Validate payload structure before assignment
+                const payload = result.payload;
+                if (typeof payload !== 'object' || payload === null) {
+                    statusEl.innerHTML = '<span class="sync-status error">❌ Invalid data format received</span>';
+                    return;
+                }
+
+                // Validate expected properties exist
+                const hasValidStructure = (
+                    typeof payload.ingredients === 'object' &&
+                    typeof payload.recipes === 'object'
+                );
+
+                if (!hasValidStructure) {
+                    statusEl.innerHTML = '<span class="sync-status error">❌ Data structure validation failed</span>';
+                    return;
+                }
+
                 // Update local data
-                DATA = result.payload;
+                DATA = {
+                    ingredients: payload.ingredients || {},
+                    recipes: payload.recipes || {},
+                    shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
+                    factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
+                    staff: payload.staff || {},
+                    profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
+                };
                 saveAllData(DATA);
                 
                 // Re-render everything
@@ -1190,6 +1215,15 @@
 
             if (!token) {
                 statusEl.innerHTML = '<span class="sync-status error">❌ Please enter GitHub token</span>';
+                return;
+            }
+
+            // Validate token format (GitHub tokens start with ghp_, gho_, ghs_, etc.)
+            const validTokenPrefixes = ['ghp_', 'gho_', 'ghs_', 'ghu_', 'github_pat_'];
+            const hasValidPrefix = validTokenPrefixes.some(prefix => token.startsWith(prefix));
+            
+            if (!hasValidPrefix) {
+                statusEl.innerHTML = '<span class="sync-status error">❌ Invalid token format. GitHub tokens should start with ghp_, gho_, etc.</span>';
                 return;
             }
 

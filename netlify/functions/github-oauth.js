@@ -93,7 +93,9 @@ exports.handler = async (event, context) => {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
-        // Add CORS headers if needed (replace * with your domain in production)
+        // SECURITY WARNING: Using wildcard '*' allows ANY domain to call this endpoint
+        // In production, replace with your specific domain: 'https://yourdomain.com'
+        // Example: 'Access-Control-Allow-Origin': 'https://gokulsweets.com'
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type'
       },

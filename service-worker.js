@@ -3,6 +3,7 @@ const CACHE_NAME = 'gokul-sweets-v1';
 const urlsToCache = [
   '/index.html',
   '/manifest.json',
+  '/supabase-client.js',
   '/icons/icon-192.svg',
   '/icons/icon-512.svg'
 ];
