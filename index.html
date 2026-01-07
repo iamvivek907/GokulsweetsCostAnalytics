@@ -61,6 +61,7 @@
         .tab-content.active{ display:block; }
         @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
         @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+        .spinning { animation: spin 1s linear infinite; display: inline-block; }
 
         .page-padding{ padding:16px; max-width:1200px; margin:0 auto; }
 
@@ -1614,7 +1615,7 @@
             if (status === 'saving') {
                 indicator.style.background = '#3b82f6';
                 indicator.style.color = 'white';
-                indicator.innerHTML = '<span style="animation: spin 1s linear infinite">⏳</span><span>Saving...</span>';
+                indicator.innerHTML = '<span class="spinning">⏳</span><span>Saving...</span>';
                 indicator.style.opacity = '1';
                 indicator.style.transform = 'translateY(0)';
             } else if (status === 'success') {
@@ -1681,27 +1682,9 @@
         window.clearLocalData = clearLocalData;
         window.saveUserData = saveUserData;
 
-        // Save data before page unload to prevent data loss on refresh
-        window.addEventListener('beforeunload', async (event) => {
-            if (window.Auth && window.Auth.isAuthenticated() && window.autoSaveTimeout) {
-                // Clear the debounce timeout and save immediately
-                clearTimeout(window.autoSaveTimeout);
-                
-                try {
-                    // Use sendBeacon for reliable fire-and-forget during page unload
-                    const deviceId = getOrCreateDeviceId();
-                    const userId = window.Auth.getCurrentUser()?.id;
-                    
-                    if (userId && window.SupabaseSync && window.SupabaseSync.isReady()) {
-                        // Force immediate save before unload
-                        await saveUserData();
-                        console.log('💾 Data saved before page unload');
-                    }
-                } catch (error) {
-                    console.error('Failed to save data before unload:', error);
-                }
-            }
-        });
+        // Note: Data is auto-saved with 1-second debounce after changes
+        // This ensures data is synced to cloud quickly without needing beforeunload
+        // localStorage is always updated immediately, providing offline persistence
 
         // run init once DOM ready
         document.addEventListener('DOMContentLoaded', initAuthSystem);
@@ -1740,7 +1723,14 @@
                         });
                     });
                 })
-                .catch(err => console.error('Service Worker registration failed:', err));
+                .catch(err => {
+                    console.error('Service Worker registration failed:', err);
+                    // Clean up interval if registration fails
+                    if (updateCheckInterval) {
+                        clearInterval(updateCheckInterval);
+                        updateCheckInterval = null;
+                    }
+                });
 
             // Listen for controller change (new SW activated)
             navigator.serviceWorker.addEventListener('controllerchange', () => {
