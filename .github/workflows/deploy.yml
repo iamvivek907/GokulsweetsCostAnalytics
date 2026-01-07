@@ -70,11 +70,19 @@ jobs:
           
           # Show masked preview of what was injected (for debugging)
           echo ""
-          echo "Injected values preview (masked):"
-          URL_PREVIEW=$(grep -o "url: '[^']*'" config.js 2>/dev/null | head -1 | cut -c1-35 || echo "url: (not found)")
-          KEY_PREVIEW=$(grep -o "anonKey: '[^']*'" config.js 2>/dev/null | head -1 | cut -c1-30 || echo "anonKey: (not found)")
-          echo "  URL (first 35 chars): ${URL_PREVIEW}..."
-          echo "  Key (first 30 chars): ${KEY_PREVIEW}..."
+          echo "Injected values preview:"
+          # Check if URL was replaced successfully
+          if grep -q "url: 'https://" config.js 2>/dev/null || grep -q 'url: "https://' config.js 2>/dev/null; then
+            echo "  ✅ SUPABASE_URL appears to be injected (starts with https://)"
+          else
+            echo "  ⚠️  SUPABASE_URL might not be a valid HTTPS URL"
+          fi
+          # Don't show any part of the API key for security
+          if grep -q "anonKey: '[^_]" config.js 2>/dev/null || grep -q 'anonKey: "[^_]' config.js 2>/dev/null; then
+            echo "  ✅ SUPABASE_ANON_KEY appears to be injected (non-placeholder value detected)"
+          else
+            echo "  ⚠️  SUPABASE_ANON_KEY might still be a placeholder"
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
