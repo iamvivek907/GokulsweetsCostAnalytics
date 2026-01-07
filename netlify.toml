@@ -1,0 +1,62 @@
+# Netlify Configuration for Gokul Sweets Cost Analytics
+
+[build]
+  # No build command needed - this is a static site
+  publish = "."
+  
+  # Command to inject environment variables at build time
+  command = '''
+    sed -i "s|url: '__SUPABASE_URL__'|url: '${SUPABASE_URL}'|g" config.js && \
+    sed -i "s|anonKey: '__SUPABASE_ANON_KEY__'|anonKey: '${SUPABASE_ANON_KEY}'|g" config.js && \
+    echo "Configuration injected successfully"
+  '''
+
+[build.environment]
+  # These will be set in Netlify dashboard
+  # SUPABASE_URL = "your-url-here"
+  # SUPABASE_ANON_KEY = "your-key-here"
+
+# Redirect rules for SPA routing
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# Security headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Cache static assets
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
+
+# Service worker should not be cached
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+# Manifest should not be cached
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"

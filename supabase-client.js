@@ -1,5 +1,5 @@
 // Supabase Client Helper for Gokul Sweets Cost Analytics
-// This helper dynamically loads the Supabase client and provides simple sync functions
+// Enhanced with authentication support and user-scoped operations
 
 (function() {
   'use strict';
@@ -9,6 +9,7 @@
     client: null,
     isInitialized: false,
     supabaseLib: null,
+    currentUserId: null,
 
     // Initialize the Supabase client with URL and anon key
     async init(supabaseUrl, supabaseKey) {
@@ -24,12 +25,29 @@
       try {
         this.client = window.supabase.createClient(supabaseUrl, supabaseKey);
         this.isInitialized = true;
+        
+        // Check for existing session and set user ID
+        const { data: { session } } = await this.client.auth.getSession();
+        if (session && session.user) {
+          this.currentUserId = session.user.id;
+        }
+        
         console.log('Supabase client initialized successfully');
         return true;
       } catch (error) {
         console.error('Failed to initialize Supabase client:', error);
         throw error;
       }
+    },
+
+    // Set current user ID (called after authentication)
+    setUserId(userId) {
+      this.currentUserId = userId;
+    },
+
+    // Get current user ID
+    getUserId() {
+      return this.currentUserId;
     },
 
     // Load Supabase library from CDN
@@ -53,21 +71,35 @@
       });
     },
 
-    // Save data to Supabase (upsert into gokul_app_data table)
-    async saveData(deviceId, payload) {
+    // Save data to Supabase (upsert into gokul_app_data table with user_id)
+    async saveData(deviceId, payload, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized. Call init() first.');
       }
 
+      // Use provided userId or current user ID
+      const userIdToUse = userId || this.currentUserId;
+      
+      if (!userIdToUse) {
+        console.warn('No user ID available, saving without user_id (legacy mode)');
+      }
+
       try {
+        const dataToSave = {
+          device_id: deviceId,
+          payload: payload,
+          updated_at: new Date().toISOString()
+        };
+
+        // Add user_id if available (for authenticated mode)
+        if (userIdToUse) {
+          dataToSave.user_id = userIdToUse;
+        }
+
         const { data, error } = await this.client
           .from('gokul_app_data')
-          .upsert({
-            device_id: deviceId,
-            payload: payload,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'device_id'
+          .upsert(dataToSave, {
+            onConflict: userIdToUse ? 'user_id,device_id' : 'device_id'
           });
 
         if (error) {
@@ -84,17 +116,26 @@
     },
 
     // Load data from Supabase (select from gokul_app_data table)
-    async loadData(deviceId) {
+    async loadData(deviceId, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized. Call init() first.');
       }
 
+      // Use provided userId or current user ID
+      const userIdToUse = userId || this.currentUserId;
+
       try {
-        const { data, error } = await this.client
+        let query = this.client
           .from('gokul_app_data')
           .select('payload, updated_at')
-          .eq('device_id', deviceId)
-          .single();
+          .eq('device_id', deviceId);
+
+        // Add user_id filter if available (for authenticated mode)
+        if (userIdToUse) {
+          query = query.eq('user_id', userIdToUse);
+        }
+
+        const { data, error } = await query.single();
 
         if (error) {
           // If no data found, return null instead of throwing
