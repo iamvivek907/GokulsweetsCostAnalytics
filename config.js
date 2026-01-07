@@ -1,6 +1,11 @@
 // Configuration for Gokul Sweets Cost Analytics
 // This file can be customized for deployment with environment-specific values
 
+// ⚠️ SECURITY WARNING ⚠️
+// If you commit Supabase credentials here and push to a PUBLIC GitHub repository,
+// ANYONE can access your Supabase database if you're using the insecure development
+// RLS policy. See DEPLOYMENT.md for secure production setup instructions.
+
 (function() {
   'use strict';
 

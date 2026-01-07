@@ -2,6 +2,12 @@
 // Example production configuration with Supabase credentials
 // Copy this to config.js and update with your actual credentials
 
+// ⚠️ SECURITY WARNING ⚠️
+// Only commit these credentials to GitHub if you have implemented SECURE
+// RLS policies with Supabase Auth. The development policy in the docs is
+// INSECURE and allows anyone with the anon key to access ALL data.
+// See DEPLOYMENT.md for secure production RLS policy examples.
+
 (function() {
   'use strict';
 
@@ -11,7 +17,8 @@
       // Your Supabase project URL
       url: 'https://yourproject.supabase.co',
       
-      // Your Supabase anon/public key (safe to expose in frontend)
+      // Your Supabase anon/public key 
+      // Safe to expose ONLY with proper RLS policies
       anonKey: 'your-anon-key-here',
       
       // Enable automatic sync on app load

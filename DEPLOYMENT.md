@@ -29,16 +29,47 @@ CREATE TABLE gokul_app_data (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Enable Row Level Security (IMPORTANT for production)
+-- Enable Row Level Security (REQUIRED for security)
 ALTER TABLE gokul_app_data ENABLE ROW LEVEL SECURITY;
 
--- Create a policy allowing anyone to insert/update their own device data
--- This is a simple policy; adjust based on your security requirements
-CREATE POLICY "Allow device access"
+-- ⚠️ SECURITY WARNING ⚠️
+-- The following policy is INSECURE and allows ANYONE with the anon key 
+-- to read/write ALL data. Use ONLY for testing/development.
+-- For production, you MUST implement authentication-based policies.
+
+CREATE POLICY "dev_allow_all_access"
 ON gokul_app_data
 FOR ALL
 USING (true)
 WITH CHECK (true);
+
+-- 🔒 RECOMMENDED PRODUCTION SETUP 🔒
+-- For production, use Supabase Auth and restrict access per user:
+-- 
+-- 1. Modify the table to include user_id:
+--    ALTER TABLE gokul_app_data ADD COLUMN user_id UUID REFERENCES auth.users(id);
+--    ALTER TABLE gokul_app_data DROP CONSTRAINT gokul_app_data_pkey;
+--    ALTER TABLE gokul_app_data ADD PRIMARY KEY (user_id, device_id);
+--
+-- 2. Replace the policy above with these secure policies:
+--    DROP POLICY "dev_allow_all_access" ON gokul_app_data;
+--    
+--    CREATE POLICY "users_select_own_data"
+--    ON gokul_app_data FOR SELECT
+--    USING (auth.uid() = user_id);
+--    
+--    CREATE POLICY "users_insert_own_data"
+--    ON gokul_app_data FOR INSERT
+--    WITH CHECK (auth.uid() = user_id);
+--    
+--    CREATE POLICY "users_update_own_data"
+--    ON gokul_app_data FOR UPDATE
+--    USING (auth.uid() = user_id)
+--    WITH CHECK (auth.uid() = user_id);
+--    
+--    CREATE POLICY "users_delete_own_data"
+--    ON gokul_app_data FOR DELETE
+--    USING (auth.uid() = user_id);
 ```
 
 3. Get your credentials from **Project Settings** → **API**:
@@ -63,11 +94,26 @@ window.AppConfig = {
 };
 ```
 
-**Important Security Notes:**
-- The anon key is public and safe to commit to your repository
-- **Always enable Row Level Security (RLS)** on your Supabase tables
-- The simple policy above allows any device to access data - for production, implement proper authentication
-- Consider using Supabase Auth for multi-user scenarios
+**⚠️ CRITICAL SECURITY NOTES:**
+
+**DO NOT commit Supabase credentials to public repositories without proper RLS policies!**
+
+- The anon key is designed to be public, but **ONLY** if proper RLS policies restrict data access
+- The development policy above (`USING (true) WITH CHECK (true)`) is **INSECURE**
+  - It allows **ANYONE** with your anon key to read/write **ALL** data in the table
+  - This means **NO** per-user or per-device isolation
+  - **NEVER** use this in production with public repositories
+  
+**Safe usage scenarios:**
+1. **Personal/Single-user app**: 
+   - Keep `config.js` credentials in a private file (don't commit to GitHub)
+   - Or use the insecure policy if you're okay with anyone reading/writing your data
+   
+2. **Multi-user/Production app**:
+   - **MUST** implement Supabase Auth
+   - **MUST** use the production RLS policies shown in the SQL above
+   - Only then is it safe to commit the anon key to GitHub
+   - Each user will only see their own data
 
 #### Step C: Commit and Deploy
 

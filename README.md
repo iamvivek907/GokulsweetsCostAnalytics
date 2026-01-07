@@ -57,6 +57,7 @@ To enable automatic cloud sync:
 1. **Create a Supabase project** at https://supabase.com
 
 2. **Create the data table** (run in SQL Editor):
+
 ```sql
 CREATE TABLE gokul_app_data (
   device_id TEXT PRIMARY KEY,
@@ -67,10 +68,36 @@ CREATE TABLE gokul_app_data (
 -- Enable Row Level Security
 ALTER TABLE gokul_app_data ENABLE ROW LEVEL SECURITY;
 
--- Create policy (adjust for your security needs)
-CREATE POLICY "Allow device access"
+-- ⚠️ DEVELOPMENT ONLY - INSECURE ⚠️
+-- This policy allows ANYONE with the anon key to access ALL data
+-- Use ONLY for testing. For production, see production policies below.
+CREATE POLICY "dev_allow_all"
 ON gokul_app_data FOR ALL
 USING (true) WITH CHECK (true);
+```
+
+**🔒 For Production with Multiple Users:**
+```sql
+-- Add user authentication column
+ALTER TABLE gokul_app_data ADD COLUMN user_id UUID REFERENCES auth.users(id);
+ALTER TABLE gokul_app_data DROP CONSTRAINT gokul_app_data_pkey;
+ALTER TABLE gokul_app_data ADD PRIMARY KEY (user_id, device_id);
+
+-- Remove insecure policy
+DROP POLICY "dev_allow_all" ON gokul_app_data;
+
+-- Add secure per-user policies
+CREATE POLICY "users_select_own" ON gokul_app_data FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "users_insert_own" ON gokul_app_data FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "users_update_own" ON gokul_app_data FOR UPDATE
+USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "users_delete_own" ON gokul_app_data FOR DELETE
+USING (auth.uid() = user_id);
 ```
 
 3. **Edit `config.js`** with your credentials:
@@ -188,10 +215,23 @@ open http://localhost:8888
 
 ## 🔒 Security
 
+### ⚠️ CRITICAL: Current Development Setup is INSECURE
+
+**The RLS policy in the basic setup allows ANYONE with the anon key to access ALL data!**
+
 ### Best Practices
-- ✅ Use anon key only (not service role key) in frontend
-- ✅ Enable Row Level Security on Supabase tables
-- ✅ Implement authentication for production
+
+**For Personal/Single-User Use:**
+- ✅ Don't commit `config.js` with credentials to public GitHub repos
+- ✅ Or keep the repository private
+- ✅ Or accept that anyone can read/write your data
+
+**For Production/Multi-User Use:**
+- ✅ **MUST** implement Supabase Auth with user login
+- ✅ **MUST** use production RLS policies (see setup section above)
+- ✅ Each user will only see their own data
+- ✅ Only then is it safe to commit anon key to GitHub
+- ❌ Never commit service role key (only use anon key in frontend)
 - ✅ Monitor Supabase usage for abuse
 - ✅ Regular backups using Export feature
 
