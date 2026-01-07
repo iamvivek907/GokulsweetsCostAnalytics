@@ -30,15 +30,16 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
+          set -e  # Exit on any error
           echo "Injecting Supabase configuration..."
           
-          # Use environment variables and proper escaping for sed
-          # Using | as delimiter to avoid conflicts with / in URLs
-          sed -i "s|url: '__SUPABASE_URL__'|url: '${SUPABASE_URL}'|g" config.js
-          sed -i "s|anonKey: '__SUPABASE_ANON_KEY__'|anonKey: '${SUPABASE_ANON_KEY}'|g" config.js
+          # Replace just the placeholder strings without surrounding context
+          # This is more robust and works regardless of spacing or formatting
+          sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" config.js
+          sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" config.js
           
           # Also inject into index.html if placeholders exist there
-          if grep -q "__SUPABASE_URL__" index.html; then
+          if grep -q "__SUPABASE_URL__" index.html 2>/dev/null; then
             sed -i "s|__SUPABASE_URL__|${SUPABASE_URL}|g" index.html
             sed -i "s|__SUPABASE_ANON_KEY__|${SUPABASE_ANON_KEY}|g" index.html
           fi
@@ -47,19 +48,40 @@ jobs:
           
       - name: Verify configuration
         run: |
-          echo "Checking if credentials were injected..."
+          echo "Verifying credential injection..."
+          
+          # Check config.js for SUPABASE_URL placeholder
           if grep -q "__SUPABASE_URL__" config.js; then
-            echo "⚠️  Warning: SUPABASE_URL placeholder not replaced"
-            echo "Make sure SUPABASE_URL secret is configured in repository settings"
+            echo "❌ ERROR: SUPABASE_URL placeholder not replaced in config.js"
+            echo "Check that SUPABASE_URL secret is set in repository settings"
+            exit 1
           else
-            echo "✅ SUPABASE_URL injected"
+            echo "✅ SUPABASE_URL successfully injected in config.js"
           fi
           
+          # Check config.js for SUPABASE_ANON_KEY placeholder
           if grep -q "__SUPABASE_ANON_KEY__" config.js; then
-            echo "⚠️  Warning: SUPABASE_ANON_KEY placeholder not replaced"
-            echo "Make sure SUPABASE_ANON_KEY secret is configured in repository settings"
+            echo "❌ ERROR: SUPABASE_ANON_KEY placeholder not replaced in config.js"
+            echo "Check that SUPABASE_ANON_KEY secret is set in repository settings"
+            exit 1
           else
-            echo "✅ SUPABASE_ANON_KEY injected"
+            echo "✅ SUPABASE_ANON_KEY successfully injected in config.js"
+          fi
+          
+          # Show masked preview of what was injected (for debugging)
+          echo ""
+          echo "Injected values preview:"
+          # Check if URL was replaced successfully
+          if grep -q "url: 'https://" config.js 2>/dev/null || grep -q 'url: "https://' config.js 2>/dev/null; then
+            echo "  ✅ SUPABASE_URL appears to be injected (starts with https://)"
+          else
+            echo "  ⚠️  SUPABASE_URL might not be a valid HTTPS URL"
+          fi
+          # Don't show any part of the API key for security
+          if grep -q "anonKey: '[^_]" config.js 2>/dev/null || grep -q 'anonKey: "[^_]' config.js 2>/dev/null; then
+            echo "  ✅ SUPABASE_ANON_KEY appears to be injected (non-placeholder value detected)"
+          else
+            echo "  ⚠️  SUPABASE_ANON_KEY might still be a placeholder"
           fi
 
       - name: Setup Pages
