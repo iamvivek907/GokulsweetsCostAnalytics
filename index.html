@@ -1109,25 +1109,24 @@
                         return;
                     }
                     
-                        // Update local data
-                        DATA = {
-                            ingredients: payload.ingredients || {},
-                            recipes: payload.recipes || {},
-                            shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
-                            factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
-                            staff: payload.staff || {},
-                            profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
-                        };
-                        saveAllData(DATA);
-                        
-                        // Re-render
-                        renderIngredientsTable();
-                        renderRecipesList();
-                        renderStaffTable();
-                        updateDashboard();
-                        
-                        console.log('Auto-sync successful: data loaded from cloud');
-                    }
+                    // Update local data
+                    DATA = {
+                        ingredients: payload.ingredients || {},
+                        recipes: payload.recipes || {},
+                        shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
+                        factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
+                        staff: payload.staff || {},
+                        profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
+                    };
+                    saveAllData(DATA);
+                    
+                    // Re-render
+                    renderIngredientsTable();
+                    renderRecipesList();
+                    renderStaffTable();
+                    updateDashboard();
+                    
+                    console.log('Auto-sync successful: data loaded from cloud');
                 } else {
                     console.log('Auto-sync: no cloud data found, using local data');
                 }
