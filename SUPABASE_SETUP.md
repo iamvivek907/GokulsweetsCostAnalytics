@@ -62,19 +62,22 @@ Once your project is ready:
 
 ```sql
 -- Create the main data table
+-- IMPORTANT: For the complete schema with all optimizations, see supabase-schema.sql
 CREATE TABLE IF NOT EXISTS gokul_app_data (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   device_id TEXT NOT NULL,
+  organization_id TEXT DEFAULT 'gokul_sweets' NOT NULL,
   payload JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, device_id)
+  UNIQUE(user_id, device_id, organization_id)
 );
 
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_gokul_app_data_user_id ON gokul_app_data(user_id);
 CREATE INDEX IF NOT EXISTS idx_gokul_app_data_device_id ON gokul_app_data(device_id);
+CREATE INDEX IF NOT EXISTS idx_gokul_app_data_organization_id ON gokul_app_data(organization_id);
 CREATE INDEX IF NOT EXISTS idx_gokul_app_data_updated_at ON gokul_app_data(updated_at DESC);
 
 -- Create function to automatically update updated_at timestamp
@@ -103,6 +106,7 @@ EXECUTE FUNCTION update_updated_at_column();
 - `id` (uuid, primary key)
 - `user_id` (uuid, foreign key to auth.users)
 - `device_id` (text)
+- `organization_id` (text, default 'gokul_sweets')
 - `payload` (jsonb) - stores all app data
 - `created_at` (timestamp)
 - `updated_at` (timestamp)
@@ -293,6 +297,39 @@ The `netlify.toml` file:
    - Each user should have separate rows
    - Each user should only see their own data in the app
 
+### Test 4: Bulk Import Feature
+
+1. **Go to Settings tab → Bulk Import (CSV) section**
+2. **Test Ingredient Import**:
+   - Click "Download Template" to see the format
+   - Paste sample data:
+     ```
+     Paneer,kg,300
+     Milk,L,60
+     Sugar,kg,45
+     ```
+   - Click "Import Ingredients"
+   - Should show success message with count
+3. **Verify**: Go to Ingredients tab → all items should appear
+4. **Test Recipe Import**:
+   - Click "Download Template" to see the format
+   - Paste sample data:
+     ```
+     Paneer Tikka,restaurant,250,10,50
+     Gulab Jamun,sweets,80,8,100
+     ```
+   - Click "Import Recipes"
+   - Should show success message with count
+5. **Verify**: Go to Recipes tab → all items should appear
+6. **Refresh page** → All data should persist
+
+**Bulk Import Benefits:**
+- Import hundreds of items at once
+- Copy directly from Excel/Google Sheets
+- Simple CSV format: no quotes, no escaping
+- Automatic validation with error messages
+- Much faster than manual entry (5 minutes vs. 2-3 hours for 100 items)
+
 ---
 
 ## Troubleshooting
@@ -332,6 +369,131 @@ The `netlify.toml` file:
    ```javascript
    await window.Auth.getSession()
    ```
+
+### Issue: Data Disappears After Refresh (CRITICAL)
+
+**Symptoms:**
+- You create recipes/ingredients
+- They show in the UI
+- After refresh, they're gone
+- Console shows `recipes: 0` when loading from cloud
+
+**Root Causes:**
+
+1. **Wrong Table Schema** - Missing `organization_id` or `user_id` columns
+2. **RLS Policy Too Restrictive** - Policy blocks authenticated users
+3. **Save Logic Uses Wrong Columns** - Code queries by columns that don't exist
+
+**Fix:**
+
+```sql
+-- 1. Check your current schema
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'gokul_app_data'
+ORDER BY ordinal_position;
+
+-- 2. Expected columns (MUST have all of these):
+-- id, user_id, device_id, organization_id, payload, created_at, updated_at
+
+-- 3. If missing columns, backup and recreate:
+SELECT * FROM gokul_app_data;  -- Save this!
+
+DROP TABLE gokul_app_data CASCADE;
+
+-- 4. Run the correct schema from supabase-schema.sql file in this repository
+
+-- 5. Verify:
+SELECT * FROM gokul_app_data WHERE user_id = auth.uid();
+```
+
+### Issue: "Force Save" Doesn't Persist Data
+
+**Check:**
+```javascript
+// Open browser console and run:
+
+// 1. Check if authenticated
+await window.Auth.getSession()
+// Should show: { user: { id: "...", email: "..." } }
+
+// 2. Check if Supabase connected
+window.SupabaseSync.isReady()
+// Should return: true
+
+// 3. Manually try to save
+const user = window.Auth.getCurrentUser();
+const result = await window.saveUserData(DATA);
+console.log(result);
+// Should show: { success: true }
+
+// 4. Check if data reached Supabase
+// Go to Supabase → Table Editor → gokul_app_data
+// Should see your row with payload containing recipes
+```
+
+**Common Issues:**
+- Not logged in → Re-login
+- Supabase URL/key wrong → Check Settings
+- RLS blocking save → Check policies
+- Network error → Check browser network tab
+
+### Issue: Multiple Users Overwriting Each Other's Data
+
+**This was a bug in the old code!**
+
+Old code (WRONG):
+```javascript
+// Updates ANY row matching organization_id
+.update(data)
+.eq('organization_id', 'gokul_sweets')  // ❌ All users match!
+```
+
+New code (CORRECT):
+```javascript
+// Updates only THIS user's row
+.update(data)
+.eq('user_id', userId)          // ✅ Specific user
+.eq('device_id', deviceId)      // ✅ Specific device
+.eq('organization_id', 'gokul_sweets')
+```
+
+**Solution:** The code has been fixed. Re-deploy the app or pull the latest changes.
+
+### Issue: "column organization_id does not exist"
+
+**Cause:** Your Supabase table was created with the OLD schema from `supabase-config.example.js` which was missing the `organization_id` column.
+
+**Solution:**
+
+1. Backup your data first:
+   ```sql
+   SELECT * FROM gokul_app_data;  -- Export this!
+   ```
+
+2. Drop the old table:
+   ```sql
+   DROP TABLE gokul_app_data CASCADE;
+   ```
+
+3. Run the correct schema from `supabase-schema.sql` in this repository
+
+4. Verify the table has all required columns:
+   ```sql
+   SELECT column_name, data_type 
+   FROM information_schema.columns 
+   WHERE table_name = 'gokul_app_data'
+   ORDER BY ordinal_position;
+   ```
+
+5. You should see:
+   - id (uuid)
+   - user_id (uuid)
+   - device_id (text)
+   - organization_id (text)  ← MUST be present!
+   - payload (jsonb)
+   - created_at (timestamp)
+   - updated_at (timestamp)
 
 ### Issue: "Row Level Security" Errors
 
