@@ -10,6 +10,9 @@
     isInitialized: false,
     supabaseLib: null,
     currentUserId: null,
+    organizationId: 'gokul_sweets',
+    realtimeChannel: null,
+    syncCallbacks: [],
 
     // Initialize the Supabase client with URL and anon key
     async init(supabaseUrl, supabaseKey) {
@@ -71,7 +74,7 @@
       });
     },
 
-    // Save data to Supabase (upsert into gokul_app_data table with user_id)
+    // Save data to Supabase (upsert into gokul_app_data table with organization_id)
     async saveData(deviceId, payload, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized. Call init() first.');
@@ -86,14 +89,13 @@
       }
 
       try {
-        console.log('Saving data to Supabase...');
+        console.log('💾 Saving data to shared workspace...');
 
-        // First, check if a record exists
+        // Check if organization record exists
         const { data: existing, error: selectError } = await this.client
           .from('gokul_app_data')
           .select('id')
-          .eq('user_id', userIdToUse)
-          .eq('device_id', deviceId)
+          .eq('organization_id', this.organizationId)
           .maybeSingle();
 
         if (selectError) {
@@ -102,29 +104,28 @@
         }
 
         let result;
+        const dataToSave = {
+          organization_id: this.organizationId,
+          user_id: userIdToUse, // Track who made the change
+          device_id: deviceId,
+          payload: payload,
+          updated_at: new Date().toISOString()
+        };
         
         if (existing) {
-          // Update existing record
-          console.log('Updating existing record...');
+          // Update existing shared record
+          console.log('Updating shared organization data...');
           result = await this.client
             .from('gokul_app_data')
-            .update({ 
-              payload: payload, 
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', existing.id)
+            .update(dataToSave)
+            .eq('organization_id', this.organizationId)
             .select();
         } else {
-          // Insert new record
-          console.log('Inserting new record...');
+          // Insert new shared record
+          console.log('Creating shared organization data...');
           result = await this.client
             .from('gokul_app_data')
-            .insert({
-              user_id: userIdToUse,
-              device_id: deviceId,
-              payload: payload,
-              updated_at: new Date().toISOString()
-            })
+            .insert(dataToSave)
             .select();
         }
 
@@ -133,7 +134,7 @@
           throw result.error;
         }
 
-        console.log('✅ Data saved to Supabase successfully:', result.data);
+        console.log('✅ Data saved to shared workspace successfully');
         return { success: true, data: result.data };
       } catch (error) {
         console.error('❌ Failed to save data:', error);
@@ -151,30 +152,31 @@
       const userIdToUse = userId || this.currentUserId;
 
       try {
-        let query = this.client
+        console.log('📥 Loading shared organization data...');
+
+        const { data, error } = await this.client
           .from('gokul_app_data')
           .select('payload, updated_at')
-          .eq('device_id', deviceId);
-
-        // Add user_id filter if available (for authenticated mode)
-        if (userIdToUse) {
-          query = query.eq('user_id', userIdToUse);
-        }
-
-        const { data, error } = await query.single();
+          .eq('organization_id', this.organizationId)
+          .maybeSingle();
 
         if (error) {
           // If no data found, return null instead of throwing
           if (error.code === 'PGRST116') {
-            console.log('No data found for device ID:', deviceId);
+            console.log('No cloud data found for organization');
             return null;
           }
           console.error('Error loading data from Supabase:', error);
           throw error;
         }
 
-        console.log('Data loaded from Supabase successfully');
-        return data;
+        if (data) {
+          console.log('✅ Loaded shared data from cloud');
+          return data;
+        } else {
+          console.log('No cloud data found for organization');
+          return null;
+        }
       } catch (error) {
         console.error('Failed to load data:', error);
         throw error;
@@ -184,6 +186,80 @@
     // Check if client is initialized
     isReady() {
       return this.isInitialized && this.client !== null;
+    },
+
+    // Initialize real-time subscription
+    initRealtimeSync() {
+      if (!this.client) {
+        console.error('Supabase client not initialized');
+        return;
+      }
+
+      console.log('🔄 Initializing real-time sync...');
+
+      // Subscribe to changes on gokul_app_data table
+      this.realtimeChannel = this.client
+        .channel('gokul_app_data_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+            schema: 'public',
+            table: 'gokul_app_data',
+            filter: `organization_id=eq.${this.organizationId}`
+          },
+          (payload) => {
+            console.log('🔔 Real-time update received:', payload);
+            this.handleRealtimeUpdate(payload);
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Real-time sync active');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Real-time sync error');
+          } else {
+            console.log('Real-time status:', status);
+          }
+        });
+    },
+
+    // Handle incoming real-time updates
+    handleRealtimeUpdate(payload) {
+      const { eventType, new: newRecord, old: oldRecord } = payload;
+
+      console.log(`Real-time ${eventType}:`, newRecord || oldRecord);
+
+      // Notify all registered callbacks
+      this.syncCallbacks.forEach(callback => {
+        try {
+          callback(eventType, newRecord);
+        } catch (error) {
+          console.error('Error in sync callback:', error);
+        }
+      });
+    },
+
+    // Register callback for real-time updates
+    onDataSync(callback) {
+      this.syncCallbacks.push(callback);
+      
+      // Return unsubscribe function
+      return () => {
+        const index = this.syncCallbacks.indexOf(callback);
+        if (index > -1) {
+          this.syncCallbacks.splice(index, 1);
+        }
+      };
+    },
+
+    // Unsubscribe from real-time updates
+    stopRealtimeSync() {
+      if (this.realtimeChannel) {
+        this.client.removeChannel(this.realtimeChannel);
+        this.realtimeChannel = null;
+        console.log('Real-time sync stopped');
+      }
     }
   };
 
