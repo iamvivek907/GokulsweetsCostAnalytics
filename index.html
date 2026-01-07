@@ -1565,7 +1565,8 @@
 
         // Deep merge utility function to properly merge nested objects
         function deepMerge(target, source) {
-            // Handle null/undefined
+            // Handle null/undefined - use || to return {} if both are falsy
+            // This ensures we always return a valid object for merging
             if (!source) return target || {};
             if (!target) return source || {};
             
