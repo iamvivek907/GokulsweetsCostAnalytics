@@ -8,9 +8,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#2d96a1">
     <meta name="description" content="Restaurant and sweets cost analytics application">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/svg+xml" href="/icons/icon-192.svg">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="./icons/icon-192.svg">
+    <link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png">
     <title>Restaurant Profit Analytics</title>
+    
+    <!-- App Configuration -->
+    <script src="./config.js"></script>
     <style>
         /* Base reset */
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1040,6 +1045,30 @@
             document.getElementById('factory-electricity').value = fo.electricity || 0;
             document.getElementById('factory-gas').value = fo.gas || 0;
 
+            // Auto-populate Supabase config if available
+            if (window.AppConfig && window.AppConfig.supabase) {
+                const supabaseUrl = document.getElementById('supabase-url');
+                const supabaseKey = document.getElementById('supabase-key');
+                
+                if (window.AppConfig.supabase.url && !supabaseUrl.value) {
+                    supabaseUrl.value = window.AppConfig.supabase.url;
+                }
+                if (window.AppConfig.supabase.anonKey && !supabaseKey.value) {
+                    supabaseKey.value = window.AppConfig.supabase.anonKey;
+                }
+                
+                // Auto-sync on load if configured
+                if (window.AppConfig.supabase.autoSync && 
+                    window.AppConfig.supabase.url && 
+                    window.AppConfig.supabase.anonKey) {
+                    console.log('Auto-sync enabled, attempting to load data from cloud...');
+                    // Delay slightly to ensure UI is ready
+                    setTimeout(() => {
+                        autoLoadFromCloud();
+                    }, 1000);
+                }
+            }
+
             renderIngredientsTable();
             renderRecipesList();
             renderStaffTable();
@@ -1052,6 +1081,57 @@
             });
         }
 
+        // Auto-load from cloud (silent, non-intrusive)
+        async function autoLoadFromCloud() {
+            try {
+                const url = document.getElementById('supabase-url').value.trim();
+                const key = document.getElementById('supabase-key').value.trim();
+                const deviceId = document.getElementById('device-id').value.trim();
+                
+                if (!url || !key || !deviceId) {
+                    console.log('Auto-sync skipped: missing credentials');
+                    return;
+                }
+                
+                await window.SupabaseSync.init(url, key);
+                const result = await window.SupabaseSync.loadData(deviceId);
+                
+                if (result && result.payload) {
+                    const payload = result.payload;
+                    
+                    // Validate payload
+                    if (typeof payload === 'object' && 
+                        typeof payload.ingredients === 'object' &&
+                        typeof payload.recipes === 'object') {
+                        
+                        // Update local data
+                        DATA = {
+                            ingredients: payload.ingredients || {},
+                            recipes: payload.recipes || {},
+                            shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
+                            factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
+                            staff: payload.staff || {},
+                            profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
+                        };
+                        saveAllData(DATA);
+                        
+                        // Re-render
+                        renderIngredientsTable();
+                        renderRecipesList();
+                        renderStaffTable();
+                        updateDashboard();
+                        
+                        console.log('Auto-sync successful: data loaded from cloud');
+                    }
+                } else {
+                    console.log('Auto-sync: no cloud data found, using local data');
+                }
+            } catch (error) {
+                console.warn('Auto-sync failed (non-critical):', error.message);
+                // Silently continue with local data
+            }
+        }
+
         // run init once DOM ready
         document.addEventListener('DOMContentLoaded', initApp);
 
@@ -1059,7 +1139,7 @@
         let newWorker = null;
 
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
+            navigator.serviceWorker.register('./service-worker.js')
                 .then(registration => {
                     console.log('Service Worker registered:', registration);
 
@@ -1289,6 +1369,6 @@
     </script>
     
     <!-- Load Supabase client helper -->
-    <script src="/supabase-client.js"></script>
+    <script src="./supabase-client.js"></script>
 </body>
 </html>
