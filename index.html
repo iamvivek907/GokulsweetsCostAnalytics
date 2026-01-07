@@ -785,7 +785,10 @@
                 if (data.ingredients && typeof data.ingredients === 'object') {
                     Object.keys(data.ingredients).forEach(id => {
                         const ing = data.ingredients[id];
-                        if (!ing || !ing.name || ing.name.trim() === '' || !ing.unit || typeof ing.price !== 'number') {
+                        if (!ing || 
+                            !ing.name || (typeof ing.name === 'string' && ing.name.trim() === '') ||
+                            !ing.unit || (typeof ing.unit === 'string' && ing.unit.trim() === '') ||
+                            typeof ing.price !== 'number') {
                             validation.valid = false;
                             validation.issues.push(`Invalid ingredient: ${id}`);
                         }
@@ -796,7 +799,7 @@
                 if (data.recipes && typeof data.recipes === 'object') {
                     Object.keys(data.recipes).forEach(id => {
                         const recipe = data.recipes[id];
-                        if (!recipe.name) {
+                        if (!recipe || !recipe.name || (typeof recipe.name === 'string' && recipe.name.trim() === '')) {
                             validation.valid = false;
                             validation.issues.push(`Recipe ${id} missing name`);
                         }
@@ -815,7 +818,10 @@
                 if (data.staff && typeof data.staff === 'object') {
                     Object.keys(data.staff).forEach(id => {
                         const staff = data.staff[id];
-                        if (!staff.name || !staff.department || typeof staff.salary !== 'number') {
+                        if (!staff ||
+                            !staff.name || (typeof staff.name === 'string' && staff.name.trim() === '') ||
+                            !staff.department || (typeof staff.department === 'string' && staff.department.trim() === '') ||
+                            typeof staff.salary !== 'number') {
                             validation.valid = false;
                             validation.issues.push(`Invalid staff: ${id}`);
                         }
@@ -1616,6 +1622,9 @@
                         console.log('✅ Cloud data found, analyzing structure...');
                         console.log('Cloud payload keys:', Object.keys(cloudData.payload));
                         
+                        // Get current local data for clean merge
+                        const localData = loadData();
+                        
                         // Count items in cloud data
                         const cloudIngredients = cloudData.payload.ingredients || {};
                         const cloudRecipes = cloudData.payload.recipes || {};
@@ -1629,12 +1638,12 @@
                         
                         // DEEP MERGE: Properly merge nested objects
                         DATA = {
-                            ingredients: deepMerge(DATA.ingredients || {}, cloudIngredients),
-                            recipes: deepMerge(DATA.recipes || {}, cloudRecipes),
-                            shop_overhead: cloudData.payload.shop_overhead || DATA.shop_overhead || { electricity: 0, gas: 0 },
-                            factory_overhead: cloudData.payload.factory_overhead || DATA.factory_overhead || { electricity: 0, gas: 0 },
-                            staff: deepMerge(DATA.staff || {}, cloudStaff),
-                            profitMargin: cloudData.payload.profitMargin || DATA.profitMargin || DEFAULT_PROFIT_MARGIN
+                            ingredients: deepMerge(localData.ingredients || {}, cloudIngredients),
+                            recipes: deepMerge(localData.recipes || {}, cloudRecipes),
+                            shop_overhead: cloudData.payload.shop_overhead || localData.shop_overhead || { electricity: 0, gas: 0 },
+                            factory_overhead: cloudData.payload.factory_overhead || localData.factory_overhead || { electricity: 0, gas: 0 },
+                            staff: deepMerge(localData.staff || {}, cloudStaff),
+                            profitMargin: cloudData.payload.profitMargin || localData.profitMargin || DEFAULT_PROFIT_MARGIN
                         };
                         
                         // Verify merge succeeded
