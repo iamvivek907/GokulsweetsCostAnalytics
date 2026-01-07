@@ -1,11 +1,12 @@
 // Service Worker for Gokul Sweets Cost Analytics PWA
-const CACHE_NAME = 'gokul-sweets-v2';
+const CACHE_NAME = 'gokul-sweets-v3'; // Bumped version for new features
 const urlsToCache = [
   './',
   './index.html',
   './manifest.json',
   './config.js',
   './supabase-client.js',
+  './auth.js',
   './icons/icon-192.svg',
   './icons/icon-512.svg',
   './icons/icon-192.png',
