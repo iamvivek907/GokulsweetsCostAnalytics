@@ -747,6 +747,7 @@
             profitMargin: 'restaurant_profit_margin'
         };
         const DEFAULT_PROFIT_MARGIN = 30;
+        const UI_REFRESH_DELAY_MS = 100; // Delay before UI refresh to ensure data is ready
 
         // Safe parse helper. Only parse if raw string exists; fallback to provided default.
         function safeGetParsed(storageKey, fallback){
@@ -784,7 +785,7 @@
                 if (data.ingredients && typeof data.ingredients === 'object') {
                     Object.keys(data.ingredients).forEach(id => {
                         const ing = data.ingredients[id];
-                        if (!ing.name || !ing.unit || typeof ing.price !== 'number') {
+                        if (!ing || !ing.name || ing.name.trim() === '' || !ing.unit || typeof ing.price !== 'number') {
                             validation.valid = false;
                             validation.issues.push(`Invalid ingredient: ${id}`);
                         }
@@ -1664,7 +1665,7 @@
                             renderRecipesList();
                             renderStaffTable();
                             console.log('✅ User data loaded and UI updated');
-                        }, 100);
+                        }, UI_REFRESH_DELAY_MS);
                         
                     } else {
                         console.log('ℹ️ No cloud data found, using local data');
@@ -1761,7 +1762,7 @@
             } catch (error) {
                 console.error('❌ Error saving to cloud:', error);
                 showSyncIndicator('error');
-                throw error;
+                // Don't throw - already handled with UI feedback
             }
         }
 
