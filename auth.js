@@ -286,7 +286,7 @@
     }
   };
 
-  // Authentication flow handlers
+  // Login handler with 15-second timeout
   window.handleLogin = async function() {
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
@@ -297,17 +297,35 @@
       return;
     }
 
-    try {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Signing in...';
-      window.AuthUI.hideError();
+    // Prevent multiple submissions
+    if (submitBtn.disabled) {
+      return;
+    }
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in...';
+    window.AuthUI.hideError();
+
+    // 15-second timeout
+    const timeoutId = setTimeout(() => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Login';
+      window.AuthUI.showError('Login timeout. Please check your connection and try again.');
+    }, 15000);
+
+    try {
       const result = await window.Auth.signIn(email, password);
+      clearTimeout(timeoutId);
       
       if (result.user) {
         window.AuthUI.hide();
         window.AuthUI.showApp();
         window.AuthUI.updateUserInfo(result.user.email);
+        
+        // Initialize real-time sync
+        if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+          window.SupabaseSync.initRealtimeSync();
+        }
         
         // Load user data
         if (typeof window.loadUserData === 'function') {
@@ -315,20 +333,28 @@
         }
       }
     } catch (error) {
+      clearTimeout(timeoutId);
+      
       let errorMessage = 'Login failed. Please try again.';
-      if (error.message && error.message.includes('Invalid login credentials')) {
-        errorMessage = 'Invalid email or password';
-      } else if (error.message && error.message.includes('Email not confirmed')) {
-        errorMessage = 'Please confirm your email address first';
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error.message) {
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Invalid email or password';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Please confirm your email address';
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection.';
+        } else {
+          errorMessage = error.message;
+        }
       }
+      
       window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Login';
     }
   };
 
+  // Signup handler with timeout
   window.handleSignup = async function() {
     const email = document.getElementById('signup-email').value.trim();
     const password = document.getElementById('signup-password').value;
@@ -350,36 +376,58 @@
       return;
     }
 
-    try {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating account...';
-      window.AuthUI.hideError();
+    if (submitBtn.disabled) {
+      return;
+    }
 
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating account...';
+    window.AuthUI.hideError();
+
+    const timeoutId = setTimeout(() => {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign Up';
+      window.AuthUI.showError('Signup timeout. Please try again.');
+    }, 15000);
+
+    try {
       const result = await window.Auth.signUp(email, password);
+      clearTimeout(timeoutId);
       
       if (result.user) {
-        // Check if email confirmation is required
         if (result.session) {
           window.AuthUI.hide();
           window.AuthUI.showApp();
           window.AuthUI.updateUserInfo(result.user.email);
           
-          // Initialize user data
+          // Initialize real-time sync
+          if (window.SupabaseSync && window.SupabaseSync.isReady()) {
+            window.SupabaseSync.initRealtimeSync();
+          }
+          
           if (typeof window.initializeUserData === 'function') {
             await window.initializeUserData(result.user.id);
           }
         } else {
-          window.AuthUI.showError('Account created! Please check your email to confirm.');
+          window.AuthUI.showError('Account created! Please check email to confirm.');
+          submitBtn.disabled = false;
           submitBtn.textContent = 'Sign Up';
         }
       }
     } catch (error) {
+      clearTimeout(timeoutId);
+      
       let errorMessage = 'Signup failed. Please try again.';
-      if (error.message && error.message.includes('already registered')) {
-        errorMessage = 'Email already registered. Please login.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error.message) {
+        if (error.message.includes('already registered')) {
+          errorMessage = 'Email already registered. Please login.';
+        } else if (error.message.includes('fetch')) {
+          errorMessage = 'Network error. Please check your connection.';
+        } else {
+          errorMessage = error.message;
+        }
       }
+      
       window.AuthUI.showError(errorMessage);
       submitBtn.disabled = false;
       submitBtn.textContent = 'Sign Up';
@@ -392,16 +440,16 @@
     }
 
     try {
+      // Stop real-time sync
+      if (window.SupabaseSync) {
+        window.SupabaseSync.stopRealtimeSync();
+      }
+      
       await window.Auth.signOut();
-      
-      // Clear user info
       window.AuthUI.clearUserInfo();
-      
-      // Hide app and show auth screen
       window.AuthUI.hideApp();
       window.AuthUI.show();
       
-      // Clear local data if needed
       if (typeof window.clearLocalData === 'function') {
         window.clearLocalData();
       }
