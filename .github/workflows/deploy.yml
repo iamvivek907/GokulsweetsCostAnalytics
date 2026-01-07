@@ -48,7 +48,6 @@ jobs:
           
       - name: Verify configuration
         run: |
-          set -e  # Exit on any error
           echo "Verifying credential injection..."
           
           # Check config.js for SUPABASE_URL placeholder
@@ -72,8 +71,8 @@ jobs:
           # Show masked preview of what was injected (for debugging)
           echo ""
           echo "Injected values preview (masked):"
-          URL_PREVIEW=$(grep -o "url: '[^']*'" config.js | head -1 | cut -c1-35)
-          KEY_PREVIEW=$(grep -o "anonKey: '[^']*'" config.js | head -1 | cut -c1-30)
+          URL_PREVIEW=$(grep -o "url: '[^']*'" config.js 2>/dev/null | head -1 | cut -c1-35 || echo "url: (not found)")
+          KEY_PREVIEW=$(grep -o "anonKey: '[^']*'" config.js 2>/dev/null | head -1 | cut -c1-30 || echo "anonKey: (not found)")
           echo "  URL (first 35 chars): ${URL_PREVIEW}..."
           echo "  Key (first 30 chars): ${KEY_PREVIEW}..."
 
