@@ -16,6 +16,9 @@
     
     <!-- App Configuration -->
     <script src="./config.js"></script>
+
+    <!-- Runtime configuration override (injected by CI/CD) -->
+    <script src="./supabase-config.runtime.js" onerror="console.warn('Runtime config not found - using config.js values')"></script>
     <style>
         /* Base reset */
         * { margin: 0; padding: 0; box-sizing: border-box; }
