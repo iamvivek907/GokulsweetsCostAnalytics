@@ -148,7 +148,7 @@
       }
     },
 
-    // Save data to shared organization workspace
+    // Save data to user's workspace (NOT shared organization)
     async saveData(deviceId, payload, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized');
@@ -160,12 +160,29 @@
       }
 
       try {
-        console.log('💾 Saving to shared workspace...');
+        console.log('💾 Saving user data to cloud...');
+        console.log('📊 Payload preview:', {
+          ingredients: Object.keys(payload.ingredients || {}).length,
+          recipes: Object.keys(payload.recipes || {}).length,
+          staff: Object.keys(payload.staff || {}).length
+        });
 
-        // Check if organization record exists
+        // CRITICAL: Validate payload before saving
+        const recipeCount = Object.keys(payload.recipes || {}).length;
+        if (recipeCount === 0 && localStorage.getItem('restaurant_recipes')) {
+          const localRecipes = JSON.parse(localStorage.getItem('restaurant_recipes') || '{}');
+          if (Object.keys(localRecipes).length > 0) {
+            console.error('❌ ABORT: Local has recipes but payload is empty - data consistency check failed');
+            return { success: false, error: 'Data validation failed' };
+          }
+        }
+
+        // Check if user's record exists
         const { data: existing, error: selectError } = await this.client
           .from('gokul_app_data')
           .select('id')
+          .eq('user_id', userId)          // ✅ Query by user_id
+          .eq('device_id', deviceId)      // ✅ Query by device_id
           .eq('organization_id', this.organizationId)
           .maybeSingle();
 
@@ -174,9 +191,9 @@
         }
 
         const dataToSave = {
-          organization_id: this.organizationId,
           user_id: userId,
           device_id: deviceId,
+          organization_id: this.organizationId,
           payload: payload,
           updated_at: new Date().toISOString()
         };
@@ -184,16 +201,18 @@
         let result;
         
         if (existing) {
-          // Update existing shared record
-          console.log('📝 Updating shared organization data...');
+          // Update user's existing record
+          console.log('📝 Updating user data...');
           result = await this.client
             .from('gokul_app_data')
             .update(dataToSave)
+            .eq('user_id', userId)        // ✅ Update only this user's row
+            .eq('device_id', deviceId)
             .eq('organization_id', this.organizationId)
             .select();
         } else {
-          // Insert new shared record
-          console.log('➕ Creating shared organization data...');
+          // Insert new record for user
+          console.log('➕ Creating user data...');
           result = await this.client
             .from('gokul_app_data')
             .insert(dataToSave)
@@ -201,41 +220,66 @@
         }
 
         if (result.error) {
+          console.error('❌ Save error:', result.error);
           throw result.error;
         }
 
-        console.log('✅ Data saved to shared workspace');
+        console.log('✅ Data saved to cloud successfully');
+        console.log('✅ Saved counts:', {
+          ingredients: Object.keys(payload.ingredients || {}).length,
+          recipes: Object.keys(payload.recipes || {}).length,
+          staff: Object.keys(payload.staff || {}).length
+        });
+        
         return { success: true, data: result.data };
       } catch (error) {
         console.error('❌ Failed to save data:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          hint: error.hint
+        });
         throw error;
       }
     },
 
-    // Load data from shared organization workspace
+    // Load data from user's workspace
     async loadData(deviceId, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized');
       }
 
+      if (!userId) {
+        console.warn('⚠️ No user ID - cannot load from cloud');
+        return null;
+      }
+
       try {
-        console.log('📥 Loading shared organization data...');
+        console.log('📥 Loading user data from cloud...');
 
         const { data, error } = await this.client
           .from('gokul_app_data')
           .select('payload, updated_at')
+          .eq('user_id', userId)          // ✅ Load only this user's data
+          .eq('device_id', deviceId)
           .eq('organization_id', this.organizationId)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
+          console.error('❌ Load error:', error);
           throw error;
         }
 
         if (data && data.payload) {
-          console.log('✅ Loaded shared data from cloud');
+          console.log('✅ Loaded user data from cloud');
+          console.log('📊 Loaded counts:', {
+            ingredients: Object.keys(data.payload.ingredients || {}).length,
+            recipes: Object.keys(data.payload.recipes || {}).length,
+            staff: Object.keys(data.payload.staff || {}).length
+          });
           return data;
         } else {
-          console.log('📭 No cloud data found for organization');
+          console.log('📭 No cloud data found for user');
           return null;
         }
       } catch (error) {

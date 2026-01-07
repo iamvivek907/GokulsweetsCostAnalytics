@@ -576,6 +576,64 @@
                     </div>
 
                     <div class="form-section">
+                        <div class="form-section-title">📤 Bulk Import (CSV)</div>
+                        <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;">
+                            Import hundreds of ingredients or recipes at once using CSV files
+                        </p>
+                        
+                        <!-- Bulk Import Ingredients -->
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:13px; font-weight:600; margin-bottom:8px; display:block;">
+                                Import Ingredients (CSV)
+                            </label>
+                            <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:8px;">
+                                Format: <code>name,unit,price</code><br>
+                                Example: <code>Paneer,kg,300</code>
+                            </p>
+                            <textarea 
+                                id="bulk-ingredients-csv" 
+                                placeholder="Paneer,kg,300&#10;Milk,L,60&#10;Sugar,kg,45&#10;Ghee,kg,550"
+                                style="min-height:100px; font-family:monospace; font-size:12px;"
+                            ></textarea>
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <button class="btn btn-primary" onclick="bulkImportIngredients()">
+                                    Import Ingredients
+                                </button>
+                                <button class="btn btn-secondary" onclick="downloadIngredientTemplate()">
+                                    📥 Download Template
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Bulk Import Recipes -->
+                        <div style="margin-bottom:16px;">
+                            <label style="font-size:13px; font-weight:600; margin-bottom:8px; display:block;">
+                                Import Recipes (CSV)
+                            </label>
+                            <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:8px;">
+                                Format: <code>name,category,sellingPrice,wastage,dailyVolume</code><br>
+                                Example: <code>Paneer Tikka,restaurant,250,10,50</code>
+                            </p>
+                            <textarea 
+                                id="bulk-recipes-csv" 
+                                placeholder="Paneer Tikka,restaurant,250,10,50&#10;Gulab Jamun,sweets,80,8,100"
+                                style="min-height:100px; font-family:monospace; font-size:12px;"
+                            ></textarea>
+                            <div style="display:flex; gap:8px; margin-top:8px;">
+                                <button class="btn btn-primary" onclick="bulkImportRecipes()">
+                                    Import Recipes
+                                </button>
+                                <button class="btn btn-secondary" onclick="downloadRecipeTemplate()">
+                                    📥 Download Template
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Import Status -->
+                        <div id="bulk-import-status" style="margin-top:12px; padding:12px; border-radius:6px; display:none;"></div>
+                    </div>
+
+                    <div class="form-section">
                         <div class="form-section-title">🔧 Advanced: GitHub Gist Quick-Save</div>
                         <p style="font-size:11px; color:var(--color-text-secondary); margin-bottom:10px;"><strong>For developers only:</strong> Save a snapshot to GitHub Gist (requires personal access token).</p>
                         <div class="form-group">
@@ -1327,6 +1385,214 @@
             renderRecipesList();
             updateDashboard();
             alert('Bulk menu uploaded');
+        }
+
+        // ------------------ BULK IMPORT CSV ------------------
+        function bulkImportIngredients() {
+            const csv = document.getElementById('bulk-ingredients-csv').value.trim();
+            
+            if (!csv) {
+                showImportStatus('error', '❌ Please enter CSV data');
+                return;
+            }
+            
+            try {
+                const lines = csv.split('\n').filter(line => line.trim());
+                let imported = 0;
+                let skipped = 0;
+                let errors = [];
+                
+                lines.forEach((line, index) => {
+                    const [name, unit, price] = line.split(',').map(s => s.trim());
+                    
+                    // Validate
+                    if (!name || !unit || !price) {
+                        errors.push(`Line ${index + 1}: Missing fields`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    const priceNum = parseFloat(price);
+                    if (isNaN(priceNum)) {
+                        errors.push(`Line ${index + 1}: Invalid price "${price}"`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Add ingredient
+                    const id = uid();
+                    DATA.ingredients[id] = {
+                        name: name,
+                        unit: unit,
+                        price: priceNum
+                    };
+                    
+                    imported++;
+                });
+                
+                // Save and refresh
+                saveAllData(DATA);
+                renderIngredientsTable();
+                
+                // Show status
+                let message = `✅ Imported ${imported} ingredients`;
+                if (skipped > 0) {
+                    message += `\n⚠️ Skipped ${skipped} lines`;
+                }
+                if (errors.length > 0 && errors.length <= 5) {
+                    message += '\n\nErrors:\n' + errors.join('\n');
+                }
+                
+                showImportStatus('success', message);
+                
+                // Clear input
+                document.getElementById('bulk-ingredients-csv').value = '';
+                
+            } catch (error) {
+                console.error('Bulk import error:', error);
+                showImportStatus('error', '❌ Import failed: ' + error.message);
+            }
+        }
+
+        function bulkImportRecipes() {
+            const csv = document.getElementById('bulk-recipes-csv').value.trim();
+            
+            if (!csv) {
+                showImportStatus('error', '❌ Please enter CSV data');
+                return;
+            }
+            
+            try {
+                const lines = csv.split('\n').filter(line => line.trim());
+                let imported = 0;
+                let skipped = 0;
+                let errors = [];
+                
+                lines.forEach((line, index) => {
+                    const [name, category, sellingPrice, wastage, dailyVolume] = line.split(',').map(s => s.trim());
+                    
+                    // Validate
+                    if (!name || !category || !sellingPrice) {
+                        errors.push(`Line ${index + 1}: Missing required fields`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    const price = parseFloat(sellingPrice);
+                    const waste = parseFloat(wastage || '10');
+                    const volume = parseInt(dailyVolume || '50');
+                    
+                    if (isNaN(price)) {
+                        errors.push(`Line ${index + 1}: Invalid price "${sellingPrice}"`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    if (!['restaurant', 'sweets'].includes(category)) {
+                        errors.push(`Line ${index + 1}: Category must be "restaurant" or "sweets"`);
+                        skipped++;
+                        return;
+                    }
+                    
+                    // Add recipe
+                    const id = uid();
+                    DATA.recipes[id] = {
+                        name: name,
+                        category: category,
+                        sellingPrice: price,
+                        wastagePercent: waste,
+                        dailyVolume: volume,
+                        ingredients: []  // User adds ingredients later
+                    };
+                    
+                    imported++;
+                });
+                
+                // Save and refresh
+                saveAllData(DATA);
+                renderRecipesList();
+                updateDashboard();
+                
+                // Show status
+                let message = `✅ Imported ${imported} recipes`;
+                if (skipped > 0) {
+                    message += `\n⚠️ Skipped ${skipped} lines`;
+                }
+                if (errors.length > 0 && errors.length <= 5) {
+                    message += '\n\nErrors:\n' + errors.join('\n');
+                }
+                
+                showImportStatus('success', message);
+                
+                // Clear input
+                document.getElementById('bulk-recipes-csv').value = '';
+                
+            } catch (error) {
+                console.error('Bulk import error:', error);
+                showImportStatus('error', '❌ Import failed: ' + error.message);
+            }
+        }
+
+        function downloadIngredientTemplate() {
+            const csv = `name,unit,price
+Paneer,kg,300
+Milk,L,60
+Sugar,kg,45
+Ghee,kg,550
+Flour (Maida),kg,35
+Oil,L,150
+Cardamom,gm,10
+Saffron,gm,5`;
+            
+            downloadCSV(csv, 'ingredients-template.csv');
+        }
+
+        function downloadRecipeTemplate() {
+            const csv = `name,category,sellingPrice,wastage,dailyVolume
+Paneer Tikka,restaurant,250,10,50
+Butter Chicken,restaurant,300,12,40
+Gulab Jamun,sweets,80,8,100
+Rasgulla,sweets,90,10,80
+Jalebi,sweets,120,15,60`;
+            
+            downloadCSV(csv, 'recipes-template.csv');
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function showImportStatus(type, message) {
+            const statusEl = document.getElementById('bulk-import-status');
+            if (!statusEl) return;
+            
+            statusEl.style.display = 'block';
+            statusEl.style.whiteSpace = 'pre-wrap';
+            
+            if (type === 'success') {
+                statusEl.style.background = 'rgba(50,184,198,0.1)';
+                statusEl.style.border = '1px solid var(--color-success)';
+                statusEl.style.color = 'var(--color-success)';
+            } else {
+                statusEl.style.background = 'rgba(255,84,89,0.1)';
+                statusEl.style.border = '1px solid var(--color-error)';
+                statusEl.style.color = 'var(--color-error)';
+            }
+            
+            statusEl.textContent = message;
+            
+            // Auto-hide after 10 seconds
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 10000);
         }
 
         function exportData(){
