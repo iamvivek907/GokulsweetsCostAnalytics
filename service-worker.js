@@ -1,11 +1,15 @@
 // Service Worker for Gokul Sweets Cost Analytics PWA
-const CACHE_NAME = 'gokul-sweets-v1';
+const CACHE_NAME = 'gokul-sweets-v2';
 const urlsToCache = [
-  '/index.html',
-  '/manifest.json',
-  '/supabase-client.js',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg'
+  './',
+  './index.html',
+  './manifest.json',
+  './config.js',
+  './supabase-client.js',
+  './icons/icon-192.svg',
+  './icons/icon-512.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 // Install event - cache app shell
@@ -18,8 +22,12 @@ self.addEventListener('install', event => {
       })
       .catch(err => {
         console.error('Cache failed:', err);
+        // Continue installation even if caching fails
+        return Promise.resolve();
       })
   );
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
 });
 
 // Activate event - cleanup old caches
