@@ -142,6 +142,89 @@
         .sync-status{ display:inline-block; padding:4px 8px; border-radius:4px; font-size:11px; font-weight:700; margin-left:8px; }
         .sync-status.success{ background:rgba(50,184,198,0.2); color:var(--color-success); }
         .sync-status.error{ background:rgba(255,84,89,0.2); color:var(--color-error); }
+
+        /* Authentication Screen */
+        #auth-screen{
+            display:none; /* Hidden by default, shown when not authenticated */
+            position:fixed; top:0; left:0; right:0; bottom:0;
+            background:var(--color-bg); z-index:999;
+            justify-content:center; align-items:center;
+            padding:20px;
+        }
+        .auth-container{
+            width:100%; max-width:420px; background:var(--color-surface);
+            border-radius:var(--radius-lg); padding:32px;
+            border:1px solid var(--color-border);
+        }
+        .auth-logo{
+            text-align:center; font-size:48px; margin-bottom:16px;
+        }
+        .auth-title{
+            text-align:center; font-size:24px; font-weight:700;
+            margin-bottom:8px; color:var(--color-text);
+        }
+        .auth-subtitle{
+            text-align:center; font-size:14px; color:var(--color-text-secondary);
+            margin-bottom:24px;
+        }
+        .auth-form{
+            display:flex; flex-direction:column; gap:16px;
+        }
+        .auth-form input{
+            width:100%; padding:12px 16px; background:var(--color-surface-light);
+            border:1px solid var(--color-border); border-radius:var(--radius);
+            color:var(--color-text); font-size:15px;
+        }
+        .auth-form input:focus{
+            outline:none; border-color:var(--color-primary);
+        }
+        .auth-form button[type="submit"]{
+            width:100%; padding:14px; background:var(--color-primary);
+            color:#fff; border:none; border-radius:var(--radius);
+            font-size:16px; font-weight:700; cursor:pointer;
+            transition:background 0.2s ease;
+        }
+        .auth-form button[type="submit"]:hover{
+            background:var(--color-primary-hover);
+        }
+        .auth-form button[type="submit"]:disabled{
+            opacity:0.5; cursor:not-allowed;
+        }
+        .auth-toggle{
+            text-align:center; margin-top:20px; font-size:14px;
+            color:var(--color-text-secondary);
+        }
+        .auth-toggle a{
+            color:var(--color-primary); text-decoration:none;
+            font-weight:600; cursor:pointer;
+        }
+        .auth-toggle a:hover{
+            text-decoration:underline;
+        }
+        #auth-error{
+            display:none; padding:12px; background:rgba(255,84,89,0.1);
+            border:1px solid var(--color-error); border-radius:var(--radius);
+            color:var(--color-error); font-size:14px; text-align:center;
+            margin-bottom:16px;
+        }
+
+        /* Header User Info */
+        .header-content{
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        #user-email{
+            display:none; font-size:12px; color:var(--color-text-secondary);
+            margin-right:8px;
+        }
+        #logout-btn{
+            display:none; padding:6px 12px; background:var(--color-surface-light);
+            border:1px solid var(--color-border); border-radius:6px;
+            color:var(--color-text); font-size:12px; cursor:pointer;
+            transition:all 0.2s ease;
+        }
+        #logout-btn:hover{
+            background:var(--color-error); color:#fff; border-color:var(--color-error);
+        }
     </style>
 </head>
 <body>
@@ -151,8 +234,87 @@
         <button onclick="updateApp()">Update Now</button>
     </div>
 
+    <!-- Authentication Screen -->
+    <div id="auth-screen">
+        <div class="auth-container">
+            <div class="auth-logo">🍽️</div>
+            <h1 class="auth-title">Gokul Sweets Analytics</h1>
+            <p class="auth-subtitle">Secure your recipes and data</p>
+
+            <div id="auth-error"></div>
+
+            <!-- Login Form -->
+            <div id="login-form" style="display:block;">
+                <form class="auth-form" onsubmit="event.preventDefault(); handleLogin();">
+                    <input 
+                        type="email" 
+                        id="login-email" 
+                        placeholder="Email address" 
+                        required 
+                        autocomplete="email"
+                    >
+                    <input 
+                        type="password" 
+                        id="login-password" 
+                        placeholder="Password" 
+                        required 
+                        autocomplete="current-password"
+                        minlength="6"
+                    >
+                    <button type="submit" id="login-submit">Login</button>
+                </form>
+                <div class="auth-toggle">
+                    <span>Don't have an account? </span>
+                    <a id="mode-toggle" onclick="window.AuthUI.toggleMode()">Sign up</a>
+                </div>
+            </div>
+
+            <!-- Signup Form -->
+            <div id="signup-form" style="display:none;">
+                <form class="auth-form" onsubmit="event.preventDefault(); handleSignup();">
+                    <input 
+                        type="email" 
+                        id="signup-email" 
+                        placeholder="Email address" 
+                        required 
+                        autocomplete="email"
+                    >
+                    <input 
+                        type="password" 
+                        id="signup-password" 
+                        placeholder="Password (min 6 characters)" 
+                        required 
+                        autocomplete="new-password"
+                        minlength="6"
+                    >
+                    <input 
+                        type="password" 
+                        id="signup-confirm-password" 
+                        placeholder="Confirm password" 
+                        required 
+                        autocomplete="new-password"
+                        minlength="6"
+                    >
+                    <button type="submit" id="signup-submit">Sign Up</button>
+                </form>
+                <div class="auth-toggle">
+                    <span>Already have an account? </span>
+                    <a onclick="window.AuthUI.toggleMode()">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="app-container">
-        <div class="header"><h1 id="page-title">Dashboard</h1></div>
+        <div class="header">
+            <div class="header-content">
+                <h1 id="page-title">Dashboard</h1>
+                <div style="display:flex; align-items:center;">
+                    <span id="user-email"></span>
+                    <button id="logout-btn" onclick="handleLogout()">Logout</button>
+                </div>
+            </div>
+        </div>
 
         <div class="content-area">
             <!-- DASHBOARD -->
@@ -612,6 +774,18 @@
             localStorage.setItem(STORAGE_KEYS.factory_overhead, JSON.stringify(data.factory_overhead));
             localStorage.setItem(STORAGE_KEYS.staff, JSON.stringify(data.staff));
             localStorage.setItem(STORAGE_KEYS.profitMargin, (data.profitMargin||DEFAULT_PROFIT_MARGIN).toString());
+            
+            // Auto-save to cloud if authenticated (debounced)
+            if (window.Auth && window.Auth.isAuthenticated()) {
+                clearTimeout(window.autoSaveTimeout);
+                window.autoSaveTimeout = setTimeout(() => {
+                    if (typeof window.saveUserData === 'function') {
+                        window.saveUserData().catch(err => {
+                            console.error('Auto-save to cloud failed:', err);
+                        });
+                    }
+                }, 2000); // Debounce for 2 seconds
+            }
         }
 
         // App state
@@ -1227,8 +1401,171 @@
             }
         }
 
+        // ------------------ AUTHENTICATION & INIT ------------------
+        
+        // Initialize authentication system
+        async function initAuthSystem() {
+            console.log('Initializing authentication system...');
+            
+            // Get Supabase configuration
+            const config = window.SupabaseConfig.getConfig();
+            
+            if (!config.isConfigured) {
+                console.warn('Supabase not configured - authentication disabled');
+                // Show app without authentication (legacy mode)
+                window.AuthUI.hideApp();
+                initApp();
+                document.getElementById('app-container').style.display = 'flex';
+                return;
+            }
+
+            try {
+                // Initialize Auth system
+                await window.Auth.init(config.url, config.anonKey);
+                
+                // Initialize Supabase sync client
+                await window.SupabaseSync.init(config.url, config.anonKey);
+                
+                // Check for existing session
+                const session = await window.Auth.getSession();
+                
+                if (session && session.user) {
+                    // User is authenticated
+                    console.log('User authenticated:', session.user.email);
+                    window.SupabaseSync.setUserId(session.user.id);
+                    
+                    // Show main app
+                    window.AuthUI.hideApp();
+                    initApp();
+                    document.getElementById('app-container').style.display = 'flex';
+                    window.AuthUI.updateUserInfo(session.user.email);
+                    
+                    // Load user data
+                    await loadUserData(session.user.id);
+                } else {
+                    // No session - show login screen
+                    console.log('No session found - showing login screen');
+                    document.getElementById('app-container').style.display = 'none';
+                    window.AuthUI.show();
+                }
+                
+                // Listen for auth state changes
+                window.Auth.onAuthStateChange(async (event, session) => {
+                    console.log('Auth state changed:', event);
+                    
+                    if (event === 'SIGNED_IN' && session) {
+                        window.SupabaseSync.setUserId(session.user.id);
+                        await loadUserData(session.user.id);
+                    } else if (event === 'SIGNED_OUT') {
+                        window.SupabaseSync.setUserId(null);
+                        clearLocalData();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Auth initialization failed:', error);
+                // Fallback to non-authenticated mode
+                window.AuthUI.hideApp();
+                initApp();
+                document.getElementById('app-container').style.display = 'flex';
+            }
+        }
+
+        // Load user data from Supabase
+        async function loadUserData(userId) {
+            try {
+                const deviceId = getOrCreateDeviceId();
+                const result = await window.SupabaseSync.loadData(deviceId, userId);
+                
+                if (result && result.payload) {
+                    const payload = result.payload;
+                    
+                    // Validate payload structure
+                    if (!payload || typeof payload !== 'object' || 
+                        typeof payload.ingredients !== 'object' ||
+                        typeof payload.recipes !== 'object') {
+                        console.warn('Invalid data structure received');
+                        return;
+                    }
+                    
+                    // Update local data
+                    DATA = {
+                        ingredients: payload.ingredients || {},
+                        recipes: payload.recipes || {},
+                        shop_overhead: payload.shop_overhead || { electricity: 0, gas: 0 },
+                        factory_overhead: payload.factory_overhead || { electricity: 0, gas: 0 },
+                        staff: payload.staff || {},
+                        profitMargin: payload.profitMargin || DEFAULT_PROFIT_MARGIN
+                    };
+                    saveAllData(DATA);
+                    
+                    // Re-render
+                    renderIngredientsTable();
+                    renderRecipesList();
+                    renderStaffTable();
+                    updateDashboard();
+                    
+                    console.log('User data loaded successfully');
+                } else {
+                    console.log('No cloud data found for user, using local/default data');
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        }
+
+        // Save user data to Supabase (called automatically when data changes)
+        async function saveUserData() {
+            if (!window.Auth.isAuthenticated()) {
+                console.log('Not authenticated, skipping cloud save');
+                return;
+            }
+
+            try {
+                const deviceId = getOrCreateDeviceId();
+                const userId = window.Auth.getCurrentUser()?.id;
+                
+                const payload = {
+                    ingredients: DATA.ingredients,
+                    recipes: DATA.recipes,
+                    shop_overhead: DATA.shop_overhead,
+                    factory_overhead: DATA.factory_overhead,
+                    staff: DATA.staff,
+                    profitMargin: DATA.profitMargin,
+                    synced_at: new Date().toISOString()
+                };
+                
+                await window.SupabaseSync.saveData(deviceId, payload, userId);
+                console.log('User data saved to cloud');
+            } catch (error) {
+                console.error('Failed to save user data:', error);
+            }
+        }
+
+        // Initialize user data for new accounts
+        async function initializeUserData(userId) {
+            // Use existing local data if available
+            await saveUserData();
+        }
+
+        // Clear local data on logout
+        function clearLocalData() {
+            console.log('Clearing local data on logout');
+            // Don't actually clear, just reload defaults
+            DATA = loadData();
+            renderIngredientsTable();
+            renderRecipesList();
+            renderStaffTable();
+            updateDashboard();
+        }
+
+        // Make saveUserData available globally for auto-sync
+        window.loadUserData = loadUserData;
+        window.initializeUserData = initializeUserData;
+        window.clearLocalData = clearLocalData;
+
         // run init once DOM ready
-        document.addEventListener('DOMContentLoaded', initApp);
+        document.addEventListener('DOMContentLoaded', initAuthSystem);
 
         // ------------------ PWA SERVICE WORKER REGISTRATION ------------------
         let newWorker = null;
@@ -1463,7 +1800,13 @@
         });
     </script>
     
+    <!-- Load Supabase configuration -->
+    <script src="./supabase-config.js"></script>
+    
     <!-- Load Supabase client helper -->
     <script src="./supabase-client.js"></script>
+    
+    <!-- Load Authentication module -->
+    <script src="./auth.js"></script>
 </body>
 </html>
