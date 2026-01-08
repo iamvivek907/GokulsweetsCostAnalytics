@@ -1,5 +1,5 @@
 // Service Worker for Gokul Sweets Cost Analytics PWA
-const CACHE_NAME = 'gokul-sweets-v3'; // Bumped version for new features
+const CACHE_NAME = 'gokul-sweets-v4-multi-table'; // Bumped version for multi-table architecture
 const urlsToCache = [
   './',
   './index.html',
@@ -7,6 +7,21 @@ const urlsToCache = [
   './config.js',
   './supabase-client.js',
   './auth.js',
+  './db/base.js',
+  './db/ingredients.js',
+  './db/recipes.js',
+  './db/staff.js',
+  './db/organizations.js',
+  './db/audit.js',
+  './sync/realtime.js',
+  './sync/offline-queue.js',
+  './sync/conflict-resolver.js',
+  './sync/sync-manager.js',
+  './ui/toast.js',
+  './ui/error-handler.js',
+  './ui/save-indicator.js',
+  './ui/conflict-ui.js',
+  './pwa/update-manager.js',
   './icons/icon-192.svg',
   './icons/icon-512.svg',
   './icons/icon-192.png',
