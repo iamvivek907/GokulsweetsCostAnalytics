@@ -2675,5 +2675,33 @@ Jalebi,sweets,120,15,60`;
     
     <!-- Load Authentication module -->
     <script src="./auth.js"></script>
+
+    <!-- Load V2 Multi-Table Architecture Modules -->
+    <!-- Database Layer -->
+    <script src="./db/base.js"></script>
+    <script src="./db/ingredients.js"></script>
+    <script src="./db/recipes.js"></script>
+    <script src="./db/staff.js"></script>
+    <script src="./db/organizations.js"></script>
+    <script src="./db/audit.js"></script>
+
+    <!-- Sync Layer -->
+    <script src="./sync/realtime.js"></script>
+    <script src="./sync/offline-queue.js"></script>
+    <script src="./sync/conflict-resolver.js"></script>
+    <script src="./sync/sync-manager.js"></script>
+
+    <!-- UI Layer -->
+    <script src="./ui/toast.js"></script>
+    <script src="./ui/error-handler.js"></script>
+    <script src="./ui/save-indicator.js"></script>
+    <script src="./ui/conflict-ui.js"></script>
+
+    <!-- PWA Layer -->
+    <script src="./pwa/update-manager.js"></script>
+
+    <!-- Migration and Initialization -->
+    <script src="./migration.js"></script>
+    <script src="./app-init.js"></script>
 </body>
 </html>
