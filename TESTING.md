@@ -314,13 +314,13 @@ WHERE organization_id = 'gokul_sweets';
 
 In browser console:
 ```javascript
-// Enable all Supabase logs
-window.SupabaseSync.client.auth.debug = true;
-
 // Monitor real-time events
 window.SupabaseSync.onDataSync((eventType, data) => {
   console.log('📡 SYNC EVENT:', eventType, data);
 });
+
+// Enable detailed console logging
+localStorage.setItem('debug', 'supabase:*');
 ```
 
 ### Force Reload from Cloud

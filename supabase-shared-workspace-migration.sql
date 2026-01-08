@@ -51,7 +51,15 @@ DECLARE
     merged_recipes JSONB := '{}';
     merged_staff JSONB := '{}';
     user_record RECORD;
+    migration_user_id UUID;
 BEGIN
+    -- Get first user_id for audit trail before deletion
+    SELECT user_id INTO migration_user_id 
+    FROM gokul_app_data 
+    WHERE organization_id = 'gokul_sweets' 
+      AND user_id IS NOT NULL
+    LIMIT 1;
+
     -- Combine all ingredients from all users
     FOR user_record IN 
         SELECT payload->'ingredients' as ingredients 
@@ -92,7 +100,7 @@ BEGIN
     -- Delete all existing user-specific records
     DELETE FROM gokul_app_data WHERE organization_id = 'gokul_sweets';
 
-    -- Insert single shared record
+    -- Insert single shared record with preserved user_id for audit
     INSERT INTO gokul_app_data (
         organization_id,
         device_id,
@@ -102,12 +110,13 @@ BEGIN
     ) VALUES (
         'gokul_sweets',
         'shared_workspace',
-        NULL,  -- No specific user owner
+        migration_user_id,  -- Preserve one user_id for audit trail
         merged_payload,
         NOW()
     );
 
     RAISE NOTICE 'Migration completed: Merged data into shared workspace';
+    RAISE NOTICE 'Audit trail user_id: %', migration_user_id;
 END $$;
 
 -- Step 4: Verification queries
@@ -118,9 +127,9 @@ SELECT
     organization_id,
     device_id,
     user_id,
-    jsonb_object_keys(payload->'ingredients') as ingredient_count,
-    jsonb_object_keys(payload->'recipes') as recipe_count,
-    jsonb_object_keys(payload->'staff') as staff_count,
+    jsonb_array_length(jsonb_object_keys(payload->'ingredients')) as ingredient_keys_sample,
+    jsonb_array_length(jsonb_object_keys(payload->'recipes')) as recipe_keys_sample,
+    jsonb_array_length(jsonb_object_keys(payload->'staff')) as staff_keys_sample,
     updated_at
 FROM gokul_app_data 
 WHERE organization_id = 'gokul_sweets';
@@ -129,12 +138,12 @@ WHERE organization_id = 'gokul_sweets';
 SELECT 
     organization_id,
     COUNT(*) as total_records,
-    (SELECT COUNT(*) FROM jsonb_object_keys(payload->'ingredients')) as ingredients,
-    (SELECT COUNT(*) FROM jsonb_object_keys(payload->'recipes')) as recipes,
-    (SELECT COUNT(*) FROM jsonb_object_keys(payload->'staff')) as staff
+    jsonb_object_keys(payload->'ingredients') as ingredient_sample_keys,
+    jsonb_object_keys(payload->'recipes') as recipe_sample_keys,
+    jsonb_object_keys(payload->'staff') as staff_sample_keys
 FROM gokul_app_data 
 WHERE organization_id = 'gokul_sweets'
-GROUP BY organization_id;
+GROUP BY organization_id, payload;
 
 -- Verify RLS policies are in place
 SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual

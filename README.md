@@ -194,9 +194,15 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 **How it Works**:
 1. **Login**: Authenticate with your email/password
 2. **Auto-Load**: Shared workspace data loads automatically
-3. **Edit & Save**: Make changes - they merge with existing data
+3. **Edit & Save**: Make changes - they merge with existing data using last-writer-wins strategy
 4. **Real-Time**: See updates from other users without refreshing
 5. **Audit Trail**: System tracks who made the last modification
+
+**Merge Strategy**:
+- Uses **last-writer-wins** for simplicity
+- When two users edit the same entity simultaneously, the last save wins
+- Different entities (recipes, ingredients, staff) from different users are combined automatically
+- For conflict-free collaboration, users should work on different entities
 
 **Manual Sync** (if needed):
 1. Go to **Settings** → Cloud Sync
