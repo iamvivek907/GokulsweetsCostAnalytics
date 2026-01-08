@@ -6,12 +6,13 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
 
 ## ✨ Features
 
-### 🔐 User Authentication (NEW!)
-- **Secure Login/Signup**: Email and password authentication via Supabase Auth
-- **Protected Data**: Each user's data is isolated with Row Level Security (RLS)
-- **Session Management**: Automatic login persistence across sessions
-- **Multi-Device Sync**: Access your data from any device after logging in
-- **Account Management**: Logout functionality and user profile display
+### 🔐 Shared Workspace Collaboration (NEW!)
+- **Multi-User Access**: All team members work in the same shared workspace
+- **Real-Time Sync**: Changes made by one user instantly appear for all others
+- **Collaborative Editing**: Multiple users can add/edit recipes, ingredients, and staff simultaneously
+- **Smart Merging**: Data from different users is intelligently combined to prevent overwrites
+- **Audit Trail**: Track who made the last modification
+- **Secure Access**: Row Level Security ensures only authenticated organization members can access data
 
 ### 📱 Progressive Web App (PWA)
 - **Install to Home Screen**: Works like a native app on mobile and desktop
@@ -20,11 +21,12 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
 - **Auto-Updates**: Users are notified when new versions are available
 
 ### ☁️ Cloud Sync with Supabase
-- **Authenticated Sync**: Automatic data sync when logged in
-- **User-Scoped Data**: Each user can only access their own recipes and data
+- **Shared Organization Data**: All users in your organization see and edit the same data
+- **Real-Time Updates**: Changes sync instantly across all devices
 - **Auto-Save**: Changes automatically sync to cloud (debounced)
 - **Secure Storage**: Data encrypted in transit and protected by RLS policies
 - **Environment Configuration**: Credentials injected at deployment time (no secrets in code)
+- **Last Modifier Tracking**: See who made the most recent changes
 
 ### 💼 Business Analytics
 - **Ingredient Management**: Track raw materials and costs
@@ -37,21 +39,33 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
 
 ### For Users
 
-**Authentication Required**: To use cloud sync features, you'll need to create an account.
+**Collaboration Made Easy**: All team members share the same workspace and can collaborate in real-time.
 
 1. **Visit the deployed app**: [Your GitHub Pages URL]
 2. **Create an account or Login**:
    - First-time users: Click "Sign up" and create an account
    - Returning users: Login with your credentials
-3. **Add to Home Screen** (optional):
+3. **Start Collaborating**: 
+   - Add ingredients, create recipes, track staff
+   - Changes you make are instantly visible to all team members
+   - See real-time updates when others make changes
+4. **Add to Home Screen** (optional):
    - On iOS: Tap Share → Add to Home Screen
    - On Android: Tap Menu → Install App
-4. **Start managing your business**: Add ingredients, create recipes, track staff
-5. **Automatic Cloud Sync**: Your data automatically syncs across all your devices
+
+#### 👥 Multi-User Collaboration Example
+
+**Scenario**: Two users (Chef and Manager) working together
+
+1. **Chef** logs in and creates a new recipe "Gulab Jamun"
+2. **Manager** (on another device) sees "Gulab Jamun" appear instantly
+3. **Manager** adds ingredient costs to the recipe
+4. **Chef** sees the updated costs in real-time
+5. Both users work on different recipes simultaneously without conflicts
 
 ### For Developers
 
-#### Deploy to GitHub Pages with Authentication
+#### Deploy to GitHub Pages with Shared Workspace
 
 **Prerequisites**: You need a Supabase project. See [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) for detailed setup instructions.
 
@@ -75,57 +89,58 @@ A Progressive Web App for restaurant and sweets shop cost analytics, profit trac
    - GitHub Actions will automatically inject credentials and deploy
    - Your app will be live at: `https://<username>.github.io/<repo-name>/`
 
-#### Configure Supabase (Required for Authentication)
+#### Configure Supabase for Shared Workspace
 
-To enable user authentication and cloud sync:
+To enable shared workspace collaboration:
 
 1. **Create a Supabase project** at https://supabase.com
 
-2. **Create the data table** (run in SQL Editor):
+2. **Set up the data table** (run in SQL Editor):
 
 ```sql
 CREATE TABLE gokul_app_data (
-  device_id TEXT PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id TEXT NOT NULL,
+  device_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id),  -- Tracks last modifier
   payload JSONB NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(organization_id, device_id)
 );
 
 -- Enable Row Level Security
 ALTER TABLE gokul_app_data ENABLE ROW LEVEL SECURITY;
-
--- ⚠️ DEVELOPMENT ONLY - INSECURE ⚠️
--- This policy allows ANYONE with the anon key to access ALL data
--- Use ONLY for testing. For production, see production policies below.
-CREATE POLICY "dev_allow_all"
-ON gokul_app_data FOR ALL
-USING (true) WITH CHECK (true);
 ```
 
-**🔒 For Production with Multiple Users:**
+3. **Run the Shared Workspace Migration**:
+
+Execute the SQL from `supabase-shared-workspace-migration.sql` in your Supabase SQL Editor. This will:
+- Drop old per-user RLS policies
+- Create new organization-based RLS policies
+- Merge existing user data into one shared record
+- Set up proper access controls
+
+**Key Shared Workspace Policies**:
 ```sql
--- Add user authentication column
-ALTER TABLE gokul_app_data ADD COLUMN user_id UUID REFERENCES auth.users(id);
-ALTER TABLE gokul_app_data DROP CONSTRAINT gokul_app_data_pkey;
-ALTER TABLE gokul_app_data ADD PRIMARY KEY (user_id, device_id);
+-- All authenticated users can access shared organization data
+CREATE POLICY "Organization members can view shared data"
+ON gokul_app_data FOR SELECT TO authenticated
+USING (organization_id = 'gokul_sweets');
 
--- Remove insecure policy
-DROP POLICY "dev_allow_all" ON gokul_app_data;
+CREATE POLICY "Organization members can update shared data"
+ON gokul_app_data FOR UPDATE TO authenticated
+USING (organization_id = 'gokul_sweets')
+WITH CHECK (organization_id = 'gokul_sweets');
 
--- Add secure per-user policies
-CREATE POLICY "users_select_own" ON gokul_app_data FOR SELECT
-USING (auth.uid() = user_id);
-
-CREATE POLICY "users_insert_own" ON gokul_app_data FOR INSERT
-WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "users_update_own" ON gokul_app_data FOR UPDATE
-USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "users_delete_own" ON gokul_app_data FOR DELETE
-USING (auth.uid() = user_id);
+-- Similar policies for INSERT and DELETE
 ```
 
-3. **Edit `config.js`** with your credentials:
+4. **Enable Realtime** (for live sync):
+   - In Supabase Dashboard → Database → Replication
+   - Enable replication for `gokul_app_data` table
+   - This allows real-time updates across all users
+
+5. **Edit `config.js`** with your credentials:
 ```javascript
 window.AppConfig = {
   supabase: {
@@ -167,14 +182,36 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 3. Or use "Bulk Upload Staff" for multiple entries
 4. Staff costs are automatically distributed across recipes
 
-#### Cloud Sync
+#### Cloud Sync & Shared Workspace
 ![Settings - Cloud Sync](https://github.com/user-attachments/assets/b21f2bb8-d99c-4917-b992-9abce6761608)
 
+**Shared Workspace Model**:
+- All authenticated users in your organization work in the same shared space
+- Changes made by one user are instantly visible to all other users
+- Real-time sync keeps everyone's view up-to-date
+- Last modifier is tracked for audit purposes
+
+**How it Works**:
+1. **Login**: Authenticate with your email/password
+2. **Auto-Load**: Shared workspace data loads automatically
+3. **Edit & Save**: Make changes - they merge with existing data using last-writer-wins strategy
+4. **Real-Time**: See updates from other users without refreshing
+5. **Audit Trail**: System tracks who made the last modification
+
+**Merge Strategy**:
+- Uses **last-writer-wins** for simplicity
+- When two users edit the same entity simultaneously, the last save wins
+- Different entities (recipes, ingredients, staff) from different users are combined automatically
+- For conflict-free collaboration, users should work on different entities
+
+**Manual Sync** (if needed):
 1. Go to **Settings** → Cloud Sync
-2. Enter Supabase URL and Anon Key (or pre-configured)
-3. Device ID is auto-generated
-4. Click "☁️ Save to Cloud" to backup
-5. Click "⬇️ Load from Cloud" to restore
+2. Click "☁️ Save to Cloud" to backup current state
+3. Click "⬇️ Load from Cloud" to reload shared data
+
+**Testing Collaboration**:
+- See [TESTING.md](./TESTING.md) for detailed testing scenarios
+- Test multi-user access, real-time sync, and data merging
 
 ### Technical Details
 
@@ -187,8 +224,10 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 #### Security Notes
 - Supabase anon key is safe to expose in frontend code
 - **Always enable Row Level Security (RLS)** on your Supabase tables
-- Consider implementing Supabase Auth for multi-user scenarios
-- Current implementation uses device_id as simple identifier
+- **Shared Workspace**: Organization-based RLS policies allow all authenticated users to access shared data
+- **Audit Trail**: `user_id` tracks who made the last modification
+- **Authentication Required**: Users must login to access the shared workspace
+- **Data Isolation**: Each organization has its own isolated workspace
 
 #### Browser Support
 - Chrome 67+ (recommended)

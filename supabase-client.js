@@ -148,7 +148,7 @@
       }
     },
 
-    // Save data to user's workspace (NOT shared organization)
+    // Save data to SHARED organization workspace
     async saveData(deviceId, payload, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized');
@@ -160,7 +160,7 @@
       }
 
       try {
-        console.log('💾 Saving user data to cloud...');
+        console.log('💾 Saving to SHARED workspace...');
         console.log('📊 Payload preview:', {
           ingredients: Object.keys(payload.ingredients || {}).length,
           recipes: Object.keys(payload.recipes || {}).length,
@@ -177,42 +177,56 @@
           }
         }
 
-        // Check if user's record exists
+        // Check if shared organization record exists
         const { data: existing, error: selectError } = await this.client
           .from('gokul_app_data')
-          .select('id')
-          .eq('user_id', userId)          // ✅ Query by user_id
-          .eq('device_id', deviceId)      // ✅ Query by device_id
-          .eq('organization_id', this.organizationId)
+          .select('id, payload')
+          .eq('organization_id', this.organizationId)  // ✅ Query by organization_id ONLY
+          .eq('device_id', 'shared_workspace')
           .maybeSingle();
 
         if (selectError && selectError.code !== 'PGRST116') {
           throw selectError;
         }
 
+        // Merge new data with existing shared data
+        let mergedPayload = payload;
+        if (existing && existing.payload) {
+          console.log('🔄 Merging with existing shared data...');
+          mergedPayload = {
+            ingredients: { ...(existing.payload.ingredients || {}), ...(payload.ingredients || {}) },
+            recipes: { ...(existing.payload.recipes || {}), ...(payload.recipes || {}) },
+            staff: { ...(existing.payload.staff || {}), ...(payload.staff || {}) }
+          };
+          console.log('📊 Merged counts:', {
+            ingredients: Object.keys(mergedPayload.ingredients).length,
+            recipes: Object.keys(mergedPayload.recipes).length,
+            staff: Object.keys(mergedPayload.staff).length
+          });
+        }
+
         const dataToSave = {
-          user_id: userId,
-          device_id: deviceId,
           organization_id: this.organizationId,
-          payload: payload,
+          device_id: 'shared_workspace',
+          user_id: userId,  // Track last modifier for audit trail
+          payload: mergedPayload,
           updated_at: new Date().toISOString()
         };
 
         let result;
         
         if (existing) {
-          // Update user's existing record
-          console.log('📝 Updating user data...');
+          // Update shared organization record
+          console.log('📝 Updating SHARED workspace...');
           result = await this.client
             .from('gokul_app_data')
             .update(dataToSave)
-            .eq('user_id', userId)        // ✅ Update only this user's row
-            .eq('device_id', deviceId)
-            .eq('organization_id', this.organizationId)
+            .eq('organization_id', this.organizationId)  // ✅ Update by organization_id ONLY
+            .eq('device_id', 'shared_workspace')
             .select();
         } else {
-          // Insert new record for user
-          console.log('➕ Creating user data...');
+          // Insert new shared record
+          console.log('➕ Creating SHARED workspace...');
           result = await this.client
             .from('gokul_app_data')
             .insert(dataToSave)
@@ -224,11 +238,12 @@
           throw result.error;
         }
 
-        console.log('✅ Data saved to cloud successfully');
+        console.log('✅ Data saved to SHARED workspace successfully');
+        console.log('✅ Last modified by user:', userId);
         console.log('✅ Saved counts:', {
-          ingredients: Object.keys(payload.ingredients || {}).length,
-          recipes: Object.keys(payload.recipes || {}).length,
-          staff: Object.keys(payload.staff || {}).length
+          ingredients: Object.keys(mergedPayload.ingredients || {}).length,
+          recipes: Object.keys(mergedPayload.recipes || {}).length,
+          staff: Object.keys(mergedPayload.staff || {}).length
         });
         
         return { success: true, data: result.data };
@@ -243,7 +258,7 @@
       }
     },
 
-    // Load data from user's workspace
+    // Load data from SHARED organization workspace
     async loadData(deviceId, userId = null) {
       if (!this.isInitialized || !this.client) {
         throw new Error('Supabase client not initialized');
@@ -255,14 +270,15 @@
       }
 
       try {
-        console.log('📥 Loading user data from cloud...');
+        console.log('📥 Loading SHARED organization data from cloud...');
 
         const { data, error } = await this.client
           .from('gokul_app_data')
-          .select('payload, updated_at')
-          .eq('user_id', userId)          // ✅ Load only this user's data
-          .eq('device_id', deviceId)
-          .eq('organization_id', this.organizationId)
+          .select('payload, updated_at, user_id')
+          .eq('organization_id', this.organizationId)  // ✅ Load by organization_id ONLY
+          .eq('device_id', 'shared_workspace')
+          .order('updated_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -271,15 +287,16 @@
         }
 
         if (data && data.payload) {
-          console.log('✅ Loaded user data from cloud');
+          console.log('✅ Loaded SHARED organization data from cloud');
           console.log('📊 Loaded counts:', {
             ingredients: Object.keys(data.payload.ingredients || {}).length,
             recipes: Object.keys(data.payload.recipes || {}).length,
             staff: Object.keys(data.payload.staff || {}).length
           });
+          console.log('👤 Last modified by user:', data.user_id);
           return data;
         } else {
-          console.log('📭 No cloud data found for user');
+          console.log('📭 No shared workspace data found');
           return null;
         }
       } catch (error) {
