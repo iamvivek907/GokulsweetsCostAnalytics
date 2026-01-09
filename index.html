@@ -1153,9 +1153,15 @@
                     price: result.data.price_per_unit
                 };
                 
-                renderIngredientsTable();
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
+                // Clear form after successful addition
                 document.getElementById('ingredient-name').value = '';
+                document.getElementById('ingredient-unit').value = 'kg';
                 document.getElementById('ingredient-price').value = '';
+                
+                renderIngredientsTable();
                 
             } catch (error) {
                 console.error('Error adding ingredient:', error);
@@ -1173,15 +1179,14 @@
                 // Update local DATA object
                 delete DATA.ingredients[id];
                 
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
                 renderIngredientsTable();
                 
             } catch (error) {
                 console.error('Error deleting ingredient:', error);
-                if (error.userMessage) {
-                    alert(error.userMessage);
-                } else {
-                    alert('Failed to delete ingredient');
-                }
+                alert(error.userMessage || error.message || 'Failed to delete ingredient');
             }
         }
 
@@ -1224,12 +1229,15 @@
                     price 
                 };
                 
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
                 renderIngredientsTable();
                 closeModal('edit-ingredient-modal');
                 
             } catch (error) {
                 console.error('Error updating ingredient:', error);
-                alert(error.message || 'Failed to update ingredient');
+                alert(error.userMessage || error.message || 'Failed to update ingredient');
             }
         }
 
@@ -1240,11 +1248,15 @@
             try {
                 await window.DB.Ingredients.delete(selectedEditIngredientId);
                 delete DATA.ingredients[selectedEditIngredientId];
+                
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
                 renderIngredientsTable();
                 closeModal('edit-ingredient-modal');
             } catch (error) {
                 console.error('Error deleting ingredient:', error);
-                alert(error.userMessage || 'Failed to delete ingredient');
+                alert(error.userMessage || error.message || 'Failed to delete ingredient');
             }
         }
 
@@ -2151,6 +2163,8 @@ Jalebi,sweets,120,15,60`;
                             // Reload ingredients from Supabase
                             loadIngredientsFromSupabase().then(() => {
                                 renderIngredientsTable();
+                            }).catch(error => {
+                                console.error('❌ Failed to reload ingredients after real-time update:', error);
                             });
                         }
                     )
