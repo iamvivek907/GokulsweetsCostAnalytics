@@ -854,18 +854,19 @@
                 const result = await window.DB.Ingredients.list();
                 
                 if (result && result.data) {
-                    // Clear existing ingredients
-                    DATA.ingredients = {};
-                    
-                    // Convert Supabase format to app format
+                    // Convert Supabase format to app format first
+                    const newIngredients = {};
                     result.data.forEach(ing => {
-                        DATA.ingredients[ing.id] = {
+                        newIngredients[ing.id] = {
                             id: ing.id,
                             name: ing.name,
                             unit: ing.unit,
                             price: ing.price_per_unit
                         };
                     });
+                    
+                    // Only update DATA after successful conversion
+                    DATA.ingredients = newIngredients;
                     
                     console.log('✅ Loaded', result.data.length, 'ingredients from Supabase');
                 }
