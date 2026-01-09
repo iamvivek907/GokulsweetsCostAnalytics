@@ -868,6 +868,11 @@
                     // Only update DATA after successful conversion
                     DATA.ingredients = newIngredients;
                     
+                    // Persist updated ingredients to localStorage for offline support
+                    if (typeof saveAllData === 'function') {
+                        saveAllData(DATA);
+                    }
+                    
                     console.log('✅ Loaded', result.data.length, 'ingredients from Supabase');
                 }
             } catch (error) {
@@ -2154,27 +2159,68 @@ Jalebi,sweets,120,15,60`;
                     return;
                 }
                 
+                // Get organization ID for scoped real-time updates
+                const organizationId = window.DB.Base.getOrganizationId();
+                if (!organizationId) {
+                    console.warn('⚠️ Cannot setup ingredients real-time sync: organizationId is not available');
+                    return;
+                }
+                
                 // Unsubscribe from existing channel if any
                 if (ingredientsRealtimeChannel) {
                     ingredientsRealtimeChannel.unsubscribe();
                 }
                 
-                // Subscribe to ingredients changes
+                // Subscribe to ingredients changes scoped to current organization
                 ingredientsRealtimeChannel = client.channel('ingredients_changes')
                     .on('postgres_changes', 
                         { 
                             event: '*', 
                             schema: 'public', 
-                            table: 'ingredients' 
+                            table: 'ingredients',
+                            filter: 'organization_id=eq.' + organizationId
                         }, 
                         (payload) => {
                             console.log('🔔 Ingredient changed:', payload);
-                            // Reload ingredients from Supabase
-                            loadIngredientsFromSupabase().then(() => {
+                            
+                            // Perform incremental update based on event type
+                            const eventType = payload.eventType;
+                            const record = payload.new || payload.old;
+                            
+                            if (!record) {
+                                console.warn('⚠️ No record data in payload, falling back to full reload');
+                                loadIngredientsFromSupabase().then(() => {
+                                    renderIngredientsTable();
+                                }).catch(error => {
+                                    console.error('❌ Failed to reload ingredients after real-time update:', error);
+                                });
+                                return;
+                            }
+                            
+                            try {
+                                if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                                    // Add or update the ingredient
+                                    DATA.ingredients[record.id] = {
+                                        id: record.id,
+                                        name: record.name,
+                                        unit: record.unit,
+                                        price: record.price_per_unit
+                                    };
+                                } else if (eventType === 'DELETE') {
+                                    // Remove the ingredient
+                                    delete DATA.ingredients[record.id];
+                                }
+                                
+                                // Persist to localStorage for offline support
+                                if (typeof saveAllData === 'function') {
+                                    saveAllData(DATA);
+                                }
+                                
+                                // Re-render the table
                                 renderIngredientsTable();
-                            }).catch(error => {
-                                console.error('❌ Failed to reload ingredients after real-time update:', error);
-                            });
+                            } catch (error) {
+                                console.error('❌ Failed to process real-time update:', error);
+                            }
                         }
                     )
                     .subscribe();
