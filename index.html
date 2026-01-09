@@ -1165,7 +1165,7 @@
                 
             } catch (error) {
                 console.error('Error adding ingredient:', error);
-                alert(error.message || 'Failed to add ingredient');
+                alert(error.userMessage || error.message || 'Failed to add ingredient');
             }
         }
 
@@ -2136,6 +2136,9 @@ Jalebi,sweets,120,15,60`;
             }
         }
 
+        // Store channel reference for cleanup
+        let ingredientsRealtimeChannel = null;
+
         // Setup real-time sync for ingredients table
         function setupIngredientsRealtimeSync() {
             try {
@@ -2150,8 +2153,13 @@ Jalebi,sweets,120,15,60`;
                     return;
                 }
                 
+                // Unsubscribe from existing channel if any
+                if (ingredientsRealtimeChannel) {
+                    ingredientsRealtimeChannel.unsubscribe();
+                }
+                
                 // Subscribe to ingredients changes
-                const channel = client.channel('ingredients_changes')
+                ingredientsRealtimeChannel = client.channel('ingredients_changes')
                     .on('postgres_changes', 
                         { 
                             event: '*', 
@@ -2403,6 +2411,14 @@ Jalebi,sweets,120,15,60`;
         // on the next login when cloud data is loaded.
         function clearLocalData() {
             console.log('🗑️ Handling logout data cleanup...');
+            
+            // Unsubscribe from real-time channels
+            if (ingredientsRealtimeChannel) {
+                ingredientsRealtimeChannel.unsubscribe();
+                ingredientsRealtimeChannel = null;
+                console.log('✅ Unsubscribed from ingredients real-time updates');
+            }
+            
             // Don't actually clear localStorage - preserve it for next login
             // This prevents data loss if user immediately logs back in
             console.log('ℹ️ Local storage preserved for next login');
