@@ -407,6 +407,17 @@
           }
         }
         
+        // Initialize V2 multi-table architecture if available
+        if (window.AppInit && !window.AppInit.isInitialized) {
+          try {
+            console.log('🚀 Initializing V2 architecture...');
+            await window.AppInit.init();
+            console.log('✅ V2 architecture initialized');
+          } catch (error) {
+            console.warn('⚠️ V2 initialization failed, using legacy mode:', error);
+          }
+        }
+        
         // CRITICAL: Re-initialize real-time sync
         if (window.SupabaseSync && window.SupabaseSync.isReady()) {
           console.log('🔄 Re-initializing real-time sync...');
@@ -517,6 +528,17 @@
           // Initialize for new user
           if (typeof window.initializeUserData === 'function') {
             await window.initializeUserData(result.user.id);
+          }
+          
+          // Initialize V2 multi-table architecture if available
+          if (window.AppInit && !window.AppInit.isInitialized) {
+            try {
+              console.log('🚀 Initializing V2 architecture...');
+              await window.AppInit.init();
+              console.log('✅ V2 architecture initialized');
+            } catch (error) {
+              console.warn('⚠️ V2 initialization failed, using legacy mode:', error);
+            }
           }
           
           // Initialize real-time sync
