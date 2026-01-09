@@ -923,7 +923,8 @@
                 ? structuredClone(data) 
                 : JSON.parse(JSON.stringify(data));
             
-            // Save to localStorage
+            // Save to localStorage AS BACKUP ONLY
+            // Primary data source is now Supabase for ingredients/recipes/staff
             try {
                 localStorage.setItem(STORAGE_KEYS.ingredients, JSON.stringify(data.ingredients));
                 localStorage.setItem(STORAGE_KEYS.recipes, JSON.stringify(data.recipes));
@@ -932,7 +933,7 @@
                 localStorage.setItem(STORAGE_KEYS.staff, JSON.stringify(data.staff));
                 localStorage.setItem(STORAGE_KEYS.profitMargin, (data.profitMargin||DEFAULT_PROFIT_MARGIN).toString());
                 
-                console.log('💾 Data saved to localStorage:', {
+                console.log('💾 Backup saved to localStorage:', {
                     ingredients: Object.keys(data.ingredients || {}).length,
                     recipes: Object.keys(data.recipes || {}).length,
                     staff: Object.keys(data.staff || {}).length
@@ -971,6 +972,33 @@
         function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
         function formatCurrency(n){ return '₹' + (isNaN(n) ? '0.00' : Number(n).toFixed(2)); }
 
+        // Helper function to load ingredients from Supabase
+        async function loadIngredientsFromSupabase() {
+            if (!window.DB || !window.DB.Ingredients) {
+                console.warn('⚠️ Supabase DB module not loaded, using localStorage');
+                return;
+            }
+            
+            try {
+                const result = await window.DB.Ingredients.list();
+                if (result.data) {
+                    // Convert array to object keyed by ID (for compatibility)
+                    DATA.ingredients = {};
+                    result.data.forEach(ing => {
+                        DATA.ingredients[ing.id] = {
+                            id: ing.id,
+                            name: ing.name,
+                            unit: ing.unit,
+                            price: ing.price_per_unit
+                        };
+                    });
+                    console.log(`✅ Loaded ${result.data.length} ingredients from Supabase`);
+                }
+            } catch (error) {
+                console.error('❌ Error loading ingredients from Supabase:', error);
+            }
+        }
+
         // ------------------ RENDER FUNCTIONS ------------------
         function updateDashboard(){
             const recipesCount = Object.keys(DATA.recipes || {}).length;
@@ -994,14 +1022,21 @@
 
         function renderIngredientsTable(){
             const tbody = document.getElementById('ingredients-table-body');
-            tbody.innerHTML = '';
             const ingredients = DATA.ingredients || {};
             const keys = Object.keys(ingredients);
+            
+            tbody.innerHTML = ''; // Clear existing
+            
             if (keys.length === 0){
                 document.getElementById('ingredients-empty').style.display = 'block';
+                const table = tbody.closest('table');
+                if (table) table.style.display = 'none';
             } else {
                 document.getElementById('ingredients-empty').style.display = 'none';
+                const table = tbody.closest('table');
+                if (table) table.style.display = 'table';
             }
+            
             keys.forEach(id => {
                 const ing = ingredients[id];
                 const tr = document.createElement('tr');
@@ -1009,6 +1044,8 @@
                     <td><button class="btn btn-secondary" onclick="openEditIngredientModal('${id}')" style="margin-right:8px;">Edit</button><button class="btn btn-danger" onclick="deleteIngredient('${id}')">Delete</button></td>`;
                 tbody.appendChild(tr);
             });
+            
+            console.log(`📊 Rendered ${keys.length} ingredients`);
             renderIngredientSelectorList();
         }
 
@@ -1096,24 +1133,61 @@
 
         // ------------------ CORE FUNCTIONALITY ------------------
         // Ingredients
-        function addIngredient(){
+        async function addIngredient(){
             const name = document.getElementById('ingredient-name').value.trim();
             const unit = document.getElementById('ingredient-unit').value;
             const price = parseFloat(document.getElementById('ingredient-price').value);
-            if (!name || isNaN(price)) { alert('Please enter valid name and price'); return; }
-            const id = uid();
-            DATA.ingredients[id] = { id, name, unit, price };
-            saveAllData(DATA);
-            renderIngredientsTable();
-            document.getElementById('ingredient-name').value = '';
-            document.getElementById('ingredient-price').value = '';
+            
+            if (!name || isNaN(price)) { 
+                alert('Please enter valid name and price'); 
+                return; 
+            }
+            
+            try {
+                // Use Supabase DB module
+                await window.DB.Ingredients.create({
+                    name: name,
+                    unit: unit,
+                    price_per_unit: price
+                });
+                
+                // Reload data from Supabase
+                await loadIngredientsFromSupabase();
+                renderIngredientsTable();
+                
+                // Clear form
+                document.getElementById('ingredient-name').value = '';
+                document.getElementById('ingredient-price').value = '';
+                
+                console.log('✅ Ingredient added successfully');
+            } catch (error) {
+                console.error('❌ Error adding ingredient:', error);
+                alert('Error: ' + (error.userMessage || error.message));
+            }
         }
 
-        function deleteIngredient(id){
+        async function deleteIngredient(id){
             if (!confirm('Delete ingredient?')) return;
-            delete DATA.ingredients[id];
-            saveAllData(DATA);
-            renderIngredientsTable();
+            
+            try {
+                // Use Supabase DB module
+                await window.DB.Ingredients.delete(id);
+                
+                // Remove from local DATA object
+                delete DATA.ingredients[id];
+                
+                // Re-render UI
+                renderIngredientsTable();
+                
+                console.log('✅ Ingredient deleted successfully');
+            } catch (error) {
+                console.error('❌ Error deleting ingredient:', error);
+                if (error.code === '23503') {
+                    alert('Cannot delete: This ingredient is used in recipes. Please remove it from recipes first.');
+                } else {
+                    alert('Error deleting ingredient: ' + (error.userMessage || error.message));
+                }
+            }
         }
 
         let selectedEditIngredientId = null;
@@ -1128,26 +1202,63 @@
             openModal('edit-ingredient-modal');
         }
 
-        function updateIngredient(){
+        async function updateIngredient(){
             if (!selectedEditIngredientId) return;
+            
             const name = document.getElementById('edit-ingredient-name').value.trim();
             const unit = document.getElementById('edit-ingredient-unit').value;
             const price = parseFloat(document.getElementById('edit-ingredient-price').value);
-            if (!name || isNaN(price)) { alert('Please enter valid name and price'); return; }
-            DATA.ingredients[selectedEditIngredientId] = { id: selectedEditIngredientId, name, unit, price };
-            saveAllData(DATA);
-            renderIngredientsTable();
-            closeModal('edit-ingredient-modal');
-            alert('Ingredient updated');
+            
+            if (!name || isNaN(price)) { 
+                alert('Please enter valid name and price'); 
+                return; 
+            }
+            
+            try {
+                // Use Supabase DB module
+                await window.DB.Ingredients.update(selectedEditIngredientId, {
+                    name: name,
+                    unit: unit,
+                    price_per_unit: price
+                });
+                
+                // Update local DATA object
+                DATA.ingredients[selectedEditIngredientId] = { 
+                    id: selectedEditIngredientId, 
+                    name, 
+                    unit, 
+                    price 
+                };
+                
+                // Re-render and close modal
+                renderIngredientsTable();
+                closeModal('edit-ingredient-modal');
+                
+                console.log('✅ Ingredient updated successfully');
+            } catch (error) {
+                console.error('❌ Error updating ingredient:', error);
+                alert('Error: ' + (error.userMessage || error.message));
+            }
         }
 
-        function deleteIngredientFromModal(){
+        async function deleteIngredientFromModal(){
             if (!selectedEditIngredientId) return;
             if (!confirm('Delete this ingredient?')) return;
-            delete DATA.ingredients[selectedEditIngredientId];
-            saveAllData(DATA);
-            renderIngredientsTable();
-            closeModal('edit-ingredient-modal');
+            
+            try {
+                await window.DB.Ingredients.delete(selectedEditIngredientId);
+                delete DATA.ingredients[selectedEditIngredientId];
+                renderIngredientsTable();
+                closeModal('edit-ingredient-modal');
+                console.log('✅ Ingredient deleted successfully');
+            } catch (error) {
+                console.error('❌ Error deleting ingredient:', error);
+                if (error.code === '23503') {
+                    alert('Cannot delete: This ingredient is used in recipes.');
+                } else {
+                    alert('Error: ' + (error.userMessage || error.message));
+                }
+            }
         }
 
 
@@ -1682,7 +1793,16 @@ Jalebi,sweets,120,15,60`;
         function removeStaff(id){ if(confirm('Remove staff?')){ delete DATA.staff[id]; saveAllData(DATA); renderStaffTable(); updateDashboard(); } }
 
         // ------------------ INIT ------------------
-        function initApp(){
+        async function initApp(){
+            console.log('🚀 Initializing app...');
+            
+            // Load data from Supabase if available (new multi-table architecture)
+            if (window.DB && window.DB.Base && window.DB.Base.isInitialized && window.DB.Base.isInitialized()) {
+                console.log('📥 Loading data from Supabase multi-table architecture...');
+                await loadIngredientsFromSupabase();
+                // TODO: Add loadRecipesFromSupabase() and loadStaffFromSupabase() in future
+            }
+            
             // populate UI inputs from DATA
             document.getElementById('profit-margin-target').value = DATA.profitMargin || DEFAULT_PROFIT_MARGIN;
             const so = DATA.shop_overhead || { electricity:0, gas:0 };
@@ -1728,6 +1848,8 @@ Jalebi,sweets,120,15,60`;
                 const el = document.getElementById(id);
                 if (el) el.addEventListener('input', updateRecipePreviewCosts);
             });
+            
+            console.log('✅ App initialized');
         }
 
         // Auto-load from cloud (silent, non-intrusive)
@@ -1796,7 +1918,7 @@ Jalebi,sweets,120,15,60`;
                 console.warn('Supabase not configured - authentication disabled');
                 // Show app without authentication (legacy mode)
                 window.AuthUI.hideApp();
-                initApp();
+                await initApp();
                 document.getElementById('app-container').style.display = 'flex';
                 return;
             }
@@ -1817,7 +1939,7 @@ Jalebi,sweets,120,15,60`;
                     
                     // Show main app
                     window.AuthUI.hideApp();
-                    initApp();
+                    await initApp();
                     document.getElementById('app-container').style.display = 'flex';
                     window.AuthUI.updateUserInfo(session.user.email);
                     
@@ -2664,6 +2786,73 @@ Jalebi,sweets,120,15,60`;
           document.head.appendChild(style);
           
           console.log('✅ Real-time sync integration loaded');
+        })();
+
+        // Multi-table real-time sync for ingredients (New Architecture)
+        (function() {
+          'use strict';
+          
+          // Setup real-time sync for ingredients using new architecture
+          function setupIngredientRealTimeSync() {
+            if (!window.Sync || !window.Sync.Realtime) {
+              console.warn('⚠️ Multi-table Sync.Realtime not available');
+              return;
+            }
+            
+            console.log('🔄 Setting up ingredients real-time sync...');
+            
+            // Register callback for ingredient changes
+            window.Sync.Realtime.on('ingredients', async (eventType, newRecord, oldRecord) => {
+              console.log('🔔 Ingredient real-time update:', eventType, newRecord, oldRecord);
+              
+              // Reload ingredients from Supabase
+              await loadIngredientsFromSupabase();
+              
+              // Re-render UI
+              renderIngredientsTable();
+              renderIngredientSelectorList();
+              updateDashboard();
+              
+              // Show toast notification if available
+              if (window.UI && window.UI.Toast) {
+                window.UI.Toast.show('📡 Ingredients synced from another device', 'info');
+              }
+            });
+            
+            console.log('✅ Ingredients real-time sync enabled');
+          }
+          
+          // Initialize when authenticated and modules are loaded
+          if (window.Auth && window.Auth.isAuthenticated && window.Auth.isAuthenticated()) {
+            // Wait for Sync.Realtime to be initialized
+            const checkAndSetup = setInterval(() => {
+              if (window.Sync?.Realtime?.isInitialized) {
+                setupIngredientRealTimeSync();
+                clearInterval(checkAndSetup);
+              }
+            }, 500);
+            
+            // Timeout after 10 seconds
+            setTimeout(() => clearInterval(checkAndSetup), 10000);
+          }
+          
+          // Also setup on auth state change
+          if (window.Auth) {
+            window.Auth.onAuthStateChange((event, session) => {
+              if (event === 'SIGNED_IN' && session) {
+                console.log('✅ User signed in, setting up ingredient real-time sync');
+                const checkAndSetup = setInterval(() => {
+                  if (window.Sync?.Realtime?.isInitialized) {
+                    setupIngredientRealTimeSync();
+                    clearInterval(checkAndSetup);
+                  }
+                }, 500);
+                setTimeout(() => clearInterval(checkAndSetup), 10000);
+              }
+            });
+          }
+          
+          console.log('✅ Multi-table ingredient real-time sync integration loaded');
         })();
     </script>
     
