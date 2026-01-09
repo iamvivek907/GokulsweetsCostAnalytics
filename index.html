@@ -1972,7 +1972,7 @@ Jalebi,sweets,120,15,60`;
                 console.error('Auth initialization failed:', error);
                 // Fallback to non-authenticated mode
                 window.AuthUI.hideApp();
-                initApp();
+                await initApp();
                 document.getElementById('app-container').style.display = 'flex';
             }
         }
