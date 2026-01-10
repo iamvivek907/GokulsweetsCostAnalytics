@@ -843,6 +843,43 @@
             return { ingredients, recipes, shop_overhead, factory_overhead, staff, profitMargin };
         }
 
+        // Load ingredients from Supabase database
+        async function loadIngredientsFromSupabase() {
+            try {
+                if (!window.DB || !window.DB.Ingredients) {
+                    console.warn('DB.Ingredients not loaded yet');
+                    return;
+                }
+                
+                const result = await window.DB.Ingredients.list();
+                
+                if (result && result.data) {
+                    // Convert Supabase format to app format, preserving data safety
+                    const newIngredients = {};
+                    result.data.forEach(ing => {
+                        newIngredients[ing.id] = {
+                            id: ing.id,
+                            name: ing.name,
+                            unit: ing.unit,
+                            price: ing.price_per_unit
+                        };
+                    });
+                    
+                    // Only update DATA after successful conversion
+                    DATA.ingredients = newIngredients;
+                    
+                    // Persist updated ingredients to localStorage for offline support
+                    if (typeof saveAllData === 'function') {
+                        saveAllData(DATA);
+                    }
+                    
+                    console.log('✅ Loaded', result.data.length, 'ingredients from Supabase');
+                }
+            } catch (error) {
+                console.error('Error loading ingredients from Supabase:', error);
+            }
+        }
+
         // Validate data structure before saving/loading
         function validateData(data) {
             const validation = {
@@ -1096,24 +1133,67 @@
 
         // ------------------ CORE FUNCTIONALITY ------------------
         // Ingredients
-        function addIngredient(){
+        async function addIngredient(){
             const name = document.getElementById('ingredient-name').value.trim();
             const unit = document.getElementById('ingredient-unit').value;
             const price = parseFloat(document.getElementById('ingredient-price').value);
-            if (!name || isNaN(price)) { alert('Please enter valid name and price'); return; }
-            const id = uid();
-            DATA.ingredients[id] = { id, name, unit, price };
-            saveAllData(DATA);
-            renderIngredientsTable();
-            document.getElementById('ingredient-name').value = '';
-            document.getElementById('ingredient-price').value = '';
+            
+            if (!name || isNaN(price)) { 
+                alert('Please enter valid name and price'); 
+                return; 
+            }
+            
+            try {
+                // Use Supabase DB module
+                const result = await window.DB.Ingredients.create({
+                    name: name,
+                    unit: unit,
+                    price_per_unit: price
+                });
+                
+                // Update local DATA object for backward compatibility
+                DATA.ingredients[result.data.id] = {
+                    id: result.data.id,
+                    name: result.data.name,
+                    unit: result.data.unit,
+                    price: result.data.price_per_unit
+                };
+                
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
+                // Clear form after successful addition
+                document.getElementById('ingredient-name').value = '';
+                document.getElementById('ingredient-unit').value = 'kg';
+                document.getElementById('ingredient-price').value = '';
+                
+                renderIngredientsTable();
+                
+            } catch (error) {
+                console.error('Error adding ingredient:', error);
+                alert(error.userMessage || error.message || 'Failed to add ingredient');
+            }
         }
 
-        function deleteIngredient(id){
+        async function deleteIngredient(id){
             if (!confirm('Delete ingredient?')) return;
-            delete DATA.ingredients[id];
-            saveAllData(DATA);
-            renderIngredientsTable();
+            
+            try {
+                // Use Supabase DB module
+                await window.DB.Ingredients.delete(id);
+                
+                // Update local DATA object
+                delete DATA.ingredients[id];
+                
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
+                renderIngredientsTable();
+                
+            } catch (error) {
+                console.error('Error deleting ingredient:', error);
+                alert(error.userMessage || error.message || 'Failed to delete ingredient');
+            }
         }
 
         let selectedEditIngredientId = null;
@@ -1128,26 +1208,62 @@
             openModal('edit-ingredient-modal');
         }
 
-        function updateIngredient(){
+        async function updateIngredient(){
             if (!selectedEditIngredientId) return;
+            
             const name = document.getElementById('edit-ingredient-name').value.trim();
             const unit = document.getElementById('edit-ingredient-unit').value;
             const price = parseFloat(document.getElementById('edit-ingredient-price').value);
-            if (!name || isNaN(price)) { alert('Please enter valid name and price'); return; }
-            DATA.ingredients[selectedEditIngredientId] = { id: selectedEditIngredientId, name, unit, price };
-            saveAllData(DATA);
-            renderIngredientsTable();
-            closeModal('edit-ingredient-modal');
-            alert('Ingredient updated');
+            
+            if (!name || isNaN(price)) { 
+                alert('Please enter valid name and price'); 
+                return; 
+            }
+            
+            try {
+                await window.DB.Ingredients.update(selectedEditIngredientId, {
+                    name: name,
+                    unit: unit,
+                    price_per_unit: price
+                });
+                
+                // Update local DATA
+                DATA.ingredients[selectedEditIngredientId] = { 
+                    id: selectedEditIngredientId, 
+                    name, 
+                    unit, 
+                    price 
+                };
+                
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
+                renderIngredientsTable();
+                closeModal('edit-ingredient-modal');
+                
+            } catch (error) {
+                console.error('Error updating ingredient:', error);
+                alert(error.userMessage || error.message || 'Failed to update ingredient');
+            }
         }
 
-        function deleteIngredientFromModal(){
+        async function deleteIngredientFromModal(){
             if (!selectedEditIngredientId) return;
             if (!confirm('Delete this ingredient?')) return;
-            delete DATA.ingredients[selectedEditIngredientId];
-            saveAllData(DATA);
-            renderIngredientsTable();
-            closeModal('edit-ingredient-modal');
+            
+            try {
+                await window.DB.Ingredients.delete(selectedEditIngredientId);
+                delete DATA.ingredients[selectedEditIngredientId];
+                
+                // Update localStorage for offline compatibility
+                saveAllData(DATA);
+                
+                renderIngredientsTable();
+                closeModal('edit-ingredient-modal');
+            } catch (error) {
+                console.error('Error deleting ingredient:', error);
+                alert(error.userMessage || error.message || 'Failed to delete ingredient');
+            }
         }
 
 
@@ -1828,6 +1944,9 @@ Jalebi,sweets,120,15,60`;
                     
                     // Load user data
                     await loadUserData(session.user.id);
+                    
+                    // Setup real-time sync for ingredients
+                    setupIngredientsRealtimeSync();
                 } else {
                     // No session - show login screen
                     console.log('No session found - showing login screen');
@@ -1841,6 +1960,7 @@ Jalebi,sweets,120,15,60`;
                     
                     if (event === 'SIGNED_IN' && session) {
                         await loadUserData(session.user.id);
+                        setupIngredientsRealtimeSync();
                     } else if (event === 'SIGNED_OUT') {
                         clearLocalData();
                     }
@@ -1960,6 +2080,9 @@ Jalebi,sweets,120,15,60`;
                         // Update localStorage with merged data
                         saveAllData(DATA);
                         
+                        // Load ingredients from Supabase database
+                        await loadIngredientsFromSupabase();
+                        
                         // Refresh all UI elements with delay to ensure data is ready
                         setTimeout(() => {
                             updateDashboard();
@@ -1975,6 +2098,9 @@ Jalebi,sweets,120,15,60`;
                         // Load from localStorage as fallback
                         const localData = loadData();
                         DATA = localData;
+                        
+                        // Load ingredients from Supabase database
+                        await loadIngredientsFromSupabase();
                         
                         // Update UI with local data
                         updateDashboard();
@@ -2013,6 +2139,95 @@ Jalebi,sweets,120,15,60`;
                 } catch (fallbackError) {
                     console.error('❌ Even fallback failed:', fallbackError);
                 }
+            }
+        }
+
+        // Store channel reference for cleanup
+        let ingredientsRealtimeChannel = null;
+
+        // Setup real-time sync for ingredients table
+        function setupIngredientsRealtimeSync() {
+            try {
+                if (!window.DB || !window.DB.Base) {
+                    console.warn('⚠️ DB.Base not loaded yet');
+                    return;
+                }
+                
+                const client = window.DB.Base.getClient();
+                if (!client) {
+                    console.warn('⚠️ Supabase client not initialized');
+                    return;
+                }
+                
+                // Get organization ID for scoped real-time updates
+                const organizationId = window.DB.Base.getOrganizationId();
+                if (!organizationId) {
+                    console.warn('⚠️ Cannot setup ingredients real-time sync: organizationId is not available');
+                    return;
+                }
+                
+                // Unsubscribe from existing channel if any
+                if (ingredientsRealtimeChannel) {
+                    ingredientsRealtimeChannel.unsubscribe();
+                }
+                
+                // Subscribe to ingredients changes scoped to current organization
+                ingredientsRealtimeChannel = client.channel('ingredients_changes')
+                    .on('postgres_changes', 
+                        { 
+                            event: '*', 
+                            schema: 'public', 
+                            table: 'ingredients',
+                            filter: 'organization_id=eq.' + organizationId
+                        }, 
+                        (payload) => {
+                            console.log('🔔 Ingredient changed:', payload);
+                            
+                            // Perform incremental update based on event type
+                            const eventType = payload.eventType;
+                            const record = payload.new || payload.old;
+                            
+                            if (!record) {
+                                console.warn('⚠️ No record data in payload, falling back to full reload');
+                                loadIngredientsFromSupabase().then(() => {
+                                    renderIngredientsTable();
+                                }).catch(error => {
+                                    console.error('❌ Failed to reload ingredients after real-time update:', error);
+                                });
+                                return;
+                            }
+                            
+                            try {
+                                if (eventType === 'INSERT' || eventType === 'UPDATE') {
+                                    // Add or update the ingredient
+                                    DATA.ingredients[record.id] = {
+                                        id: record.id,
+                                        name: record.name,
+                                        unit: record.unit,
+                                        price: record.price_per_unit
+                                    };
+                                } else if (eventType === 'DELETE') {
+                                    // Remove the ingredient
+                                    delete DATA.ingredients[record.id];
+                                }
+                                
+                                // Persist to localStorage for offline support
+                                if (typeof saveAllData === 'function') {
+                                    saveAllData(DATA);
+                                }
+                                
+                                // Re-render the table
+                                renderIngredientsTable();
+                            } catch (error) {
+                                console.error('❌ Failed to process real-time update:', error);
+                            }
+                        }
+                    )
+                    .subscribe();
+                
+                console.log('✅ Subscribed to ingredients real-time updates');
+            } catch (error) {
+                console.error('❌ Failed to setup ingredients real-time sync:', error);
             }
         }
 
@@ -2243,6 +2458,14 @@ Jalebi,sweets,120,15,60`;
         // on the next login when cloud data is loaded.
         function clearLocalData() {
             console.log('🗑️ Handling logout data cleanup...');
+            
+            // Unsubscribe from real-time channels
+            if (ingredientsRealtimeChannel) {
+                ingredientsRealtimeChannel.unsubscribe();
+                ingredientsRealtimeChannel = null;
+                console.log('✅ Unsubscribed from ingredients real-time updates');
+            }
+            
             // Don't actually clear localStorage - preserve it for next login
             // This prevents data loss if user immediately logs back in
             console.log('ℹ️ Local storage preserved for next login');
