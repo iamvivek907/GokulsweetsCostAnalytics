@@ -1151,6 +1151,11 @@
                     price_per_unit: price
                 });
                 
+                // Validate result before accessing data
+                if (!result || !result.data) {
+                    throw new Error('Invalid response from database');
+                }
+                
                 // Update local DATA object for backward compatibility
                 DATA.ingredients[result.data.id] = {
                     id: result.data.id,
@@ -2188,7 +2193,7 @@ Jalebi,sweets,120,15,60`;
                             const record = payload.new || payload.old;
                             
                             if (!record) {
-                                console.warn('⚠️ No record data in payload, falling back to full reload');
+                                console.warn(`⚠️ No record data in payload for ${eventType} event, falling back to full reload. Payload:`, payload);
                                 loadIngredientsFromSupabase().then(() => {
                                     renderIngredientsTable();
                                 }).catch(error => {
