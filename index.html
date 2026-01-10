@@ -877,6 +877,10 @@
                 }
             } catch (error) {
                 console.error('Error loading ingredients from Supabase:', error);
+                // Provide user-visible feedback that data may be stale or incomplete
+                if (window.UI && window.UI.Toast) {
+                    window.UI.Toast.warning('Unable to load the latest ingredients from the server. The ingredients list may be outdated.', 6000);
+                }
             }
         }
 
@@ -1169,7 +1173,7 @@
                 
                 // Clear form after successful addition
                 document.getElementById('ingredient-name').value = '';
-                document.getElementById('ingredient-unit').value = 'kg';
+                // Keep the user's selected unit instead of resetting to 'kg'
                 document.getElementById('ingredient-price').value = '';
                 
                 renderIngredientsTable();
@@ -1226,19 +1230,29 @@
             }
             
             try {
-                await window.DB.Ingredients.update(selectedEditIngredientId, {
+                const result = await window.DB.Ingredients.update(selectedEditIngredientId, {
                     name: name,
                     unit: unit,
                     price_per_unit: price
                 });
                 
-                // Update local DATA
-                DATA.ingredients[selectedEditIngredientId] = { 
-                    id: selectedEditIngredientId, 
-                    name, 
-                    unit, 
-                    price 
-                };
+                // Update local DATA using the database response for consistency
+                if (result && result.data) {
+                    DATA.ingredients[selectedEditIngredientId] = { 
+                        id: result.data.id || selectedEditIngredientId, 
+                        name: result.data.name || name, 
+                        unit: result.data.unit || unit, 
+                        price: result.data.price_per_unit || price
+                    };
+                } else {
+                    // Fallback to local values if no data returned
+                    DATA.ingredients[selectedEditIngredientId] = { 
+                        id: selectedEditIngredientId, 
+                        name, 
+                        unit, 
+                        price 
+                    };
+                }
                 
                 // Update localStorage for offline compatibility
                 saveAllData(DATA);
@@ -2085,8 +2099,11 @@ Jalebi,sweets,120,15,60`;
                         // Update localStorage with merged data
                         saveAllData(DATA);
                         
-                        // Load ingredients from Supabase database
-                        await loadIngredientsFromSupabase();
+                        // Load ingredients from Supabase database only if we don't already have ingredients
+                        // This prevents overwriting merged data if the new ingredients table is not yet populated
+                        if (!DATA.ingredients || Object.keys(DATA.ingredients).length === 0) {
+                            await loadIngredientsFromSupabase();
+                        }
                         
                         // Refresh all UI elements with delay to ensure data is ready
                         setTimeout(() => {
@@ -2104,8 +2121,11 @@ Jalebi,sweets,120,15,60`;
                         const localData = loadData();
                         DATA = localData;
                         
-                        // Load ingredients from Supabase database
-                        await loadIngredientsFromSupabase();
+                        // Load ingredients from Supabase database only if we don't have local ingredients
+                        // This prevents overwriting local data if migration hasn't occurred yet
+                        if (!DATA.ingredients || Object.keys(DATA.ingredients).length === 0) {
+                            await loadIngredientsFromSupabase();
+                        }
                         
                         // Update UI with local data
                         updateDashboard();
@@ -2190,7 +2210,14 @@ Jalebi,sweets,120,15,60`;
                             
                             // Perform incremental update based on event type
                             const eventType = payload.eventType;
-                            const record = payload.new || payload.old;
+                            
+                            // For DELETE events, use payload.old; for INSERT/UPDATE, use payload.new
+                            let record;
+                            if (eventType === 'DELETE') {
+                                record = payload.old;
+                            } else {
+                                record = payload.new;
+                            }
                             
                             if (!record) {
                                 console.warn(`⚠️ No record data in payload for ${eventType} event, falling back to full reload. Payload:`, payload);
@@ -2204,7 +2231,7 @@ Jalebi,sweets,120,15,60`;
                             
                             try {
                                 if (eventType === 'INSERT' || eventType === 'UPDATE') {
-                                    // Add or update the ingredient
+                                    // Add or update the ingredient using payload.new
                                     DATA.ingredients[record.id] = {
                                         id: record.id,
                                         name: record.name,
@@ -2212,7 +2239,7 @@ Jalebi,sweets,120,15,60`;
                                         price: record.price_per_unit
                                     };
                                 } else if (eventType === 'DELETE') {
-                                    // Remove the ingredient
+                                    // Remove the ingredient using payload.old
                                     delete DATA.ingredients[record.id];
                                 }
                                 
